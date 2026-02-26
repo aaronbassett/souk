@@ -360,7 +360,10 @@ mod tests {
         let bp1 = guard1.backup_path().unwrap().to_path_buf();
         let bp2 = guard2.backup_path().unwrap().to_path_buf();
 
-        assert_ne!(bp1, bp2, "two guards created rapidly should have different backup paths");
+        assert_ne!(
+            bp1, bp2,
+            "two guards created rapidly should have different backup paths"
+        );
 
         // Both backups should exist and contain the original content
         assert!(bp1.exists());
