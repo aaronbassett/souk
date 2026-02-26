@@ -1,0 +1,21 @@
+[package]
+name = "souk"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "souk"
+path = "src/main.rs"
+
+[dependencies]
+souk-core = { path = "../souk-core" }
+clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
+colored = "2"
+serde_json = "1"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+insta = { version = "1", features = ["yaml"] }
+tempfile = "3"
