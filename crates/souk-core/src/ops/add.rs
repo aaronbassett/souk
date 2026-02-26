@@ -170,6 +170,60 @@ pub fn plan_add(
     Ok(AddPlan { actions })
 }
 
+/// Inner marketplace mutation, separated for cleanup-on-failure in execute_add.
+fn execute_add_marketplace(
+    effective_actions: &[&AddAction],
+    config: &MarketplaceConfig,
+) -> Result<Vec<String>, SoukError> {
+    let guard = AtomicGuard::new(&config.marketplace_path)?;
+
+    let content = fs::read_to_string(&config.marketplace_path)?;
+    let mut marketplace: Marketplace = serde_json::from_str(&content)?;
+
+    let mut added_names = Vec::new();
+
+    for action in effective_actions {
+        let (final_name, final_source) = match &action.conflict {
+            Some(ConflictResolution::Replace) => {
+                marketplace.plugins.retain(|p| p.name != action.plugin_name);
+                (action.plugin_name.clone(), action.source.clone())
+            }
+            Some(ConflictResolution::Rename(new_name)) => (new_name.clone(), new_name.clone()),
+            Some(ConflictResolution::Skip) => continue,
+            None => (action.plugin_name.clone(), action.source.clone()),
+        };
+
+        let manifest = read_plugin_manifest(&action.plugin_path)?;
+        let tags = manifest.keywords;
+
+        marketplace.plugins.push(PluginEntry {
+            name: final_name.clone(),
+            source: final_source,
+            tags,
+        });
+
+        added_names.push(final_name);
+    }
+
+    marketplace.version = bump_patch(&marketplace.version)?;
+
+    let json = serde_json::to_string_pretty(&marketplace)?;
+    fs::write(&config.marketplace_path, format!("{json}\n"))?;
+
+    let updated_config = load_marketplace_config(&config.marketplace_path)?;
+    let validation = validate_marketplace(&updated_config, true);
+    if validation.has_errors() {
+        drop(guard);
+        return Err(SoukError::AtomicRollback(
+            "Final validation failed after add".to_string(),
+        ));
+    }
+
+    guard.commit()?;
+
+    Ok(added_names)
+}
+
 /// Executes the add plan, modifying the filesystem and marketplace.json.
 ///
 /// If `dry_run` is true, no changes are made and the function returns early
@@ -179,7 +233,7 @@ pub fn plan_add(
 ///
 /// Returns an error if copying, atomic update, version bump, or final
 /// validation fails. On atomic update failure, the AtomicGuard restores
-/// the original marketplace.json.
+/// the original marketplace.json. Copied directories are cleaned up on failure.
 pub fn execute_add(
     plan: &AddPlan,
     config: &MarketplaceConfig,
@@ -209,6 +263,9 @@ pub fn execute_add(
     }
 
     // Phase 4: Copy external plugins
+    // Track directories we copy so we can clean up on failure
+    let mut copied_dirs: Vec<PathBuf> = Vec::new();
+
     for action in &effective_actions {
         if action.is_external && !action.source.starts_with('/') {
             let target_name = match &action.conflict {
@@ -230,64 +287,21 @@ pub fn execute_add(
             }
 
             copy_dir_recursive(&action.plugin_path, &target_dir)?;
+            copied_dirs.push(target_dir);
         }
     }
 
-    // Phase 5: Atomic update
-    let guard = AtomicGuard::new(&config.marketplace_path)?;
+    // Phase 5-7: Atomic update, version bump, validation
+    let result = execute_add_marketplace(&effective_actions, config);
 
-    let content = fs::read_to_string(&config.marketplace_path)?;
-    let mut marketplace: Marketplace = serde_json::from_str(&content)?;
-
-    let mut added_names = Vec::new();
-
-    for action in &effective_actions {
-        let (final_name, final_source) = match &action.conflict {
-            Some(ConflictResolution::Replace) => {
-                // Remove existing entry
-                marketplace.plugins.retain(|p| p.name != action.plugin_name);
-                (action.plugin_name.clone(), action.source.clone())
-            }
-            Some(ConflictResolution::Rename(new_name)) => (new_name.clone(), new_name.clone()),
-            Some(ConflictResolution::Skip) => continue,
-            None => (action.plugin_name.clone(), action.source.clone()),
-        };
-
-        // Read tags from plugin.json
-        let manifest = read_plugin_manifest(&action.plugin_path)?;
-        let tags = manifest.keywords;
-
-        marketplace.plugins.push(PluginEntry {
-            name: final_name.clone(),
-            source: final_source,
-            tags,
-        });
-
-        added_names.push(final_name);
+    if result.is_err() {
+        // Clean up copied directories on failure
+        for dir in &copied_dirs {
+            let _ = fs::remove_dir_all(dir);
+        }
     }
 
-    // Phase 6: Version bump (patch)
-    marketplace.version = bump_patch(&marketplace.version)?;
-
-    // Write back
-    let json = serde_json::to_string_pretty(&marketplace)?;
-    fs::write(&config.marketplace_path, format!("{json}\n"))?;
-
-    // Phase 7: Final validation
-    let updated_config = load_marketplace_config(&config.marketplace_path)?;
-    let validation = validate_marketplace(&updated_config, true);
-    if validation.has_errors() {
-        // Let the guard drop to restore the backup
-        drop(guard);
-        return Err(SoukError::AtomicRollback(
-            "Final validation failed after add".to_string(),
-        ));
-    }
-
-    // Commit the guard (removes backup)
-    guard.commit()?;
-
-    Ok(added_names)
+    result
 }
 
 /// Resolves a plugin input (path or name) to an absolute path.
@@ -598,6 +612,38 @@ mod tests {
         assert!(
             err_msg.contains("Symlink"),
             "Error should mention symlink: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn add_cleans_up_copied_dir_on_marketplace_failure() {
+        let tmp = TempDir::new().unwrap();
+        let config = setup_marketplace(&tmp, "");
+
+        // Create external plugin
+        let external_dir = TempDir::new().unwrap();
+        create_plugin(external_dir.path(), "ext-plugin");
+        let ext_path = external_dir.path().join("ext-plugin");
+
+        let plan = plan_add(
+            &[ext_path.to_string_lossy().to_string()],
+            &config,
+            "abort",
+            false,
+        )
+        .unwrap();
+
+        // Corrupt marketplace.json so validation will fail after copy
+        fs::write(&config.marketplace_path, "not valid json").unwrap();
+
+        let result = execute_add(&plan, &config, false);
+        assert!(result.is_err());
+
+        // The copied directory should have been cleaned up
+        let would_be_copied = config.plugin_root_abs.join("ext-plugin");
+        assert!(
+            !would_be_copied.exists(),
+            "Copied dir should be cleaned up on failure"
         );
     }
 
