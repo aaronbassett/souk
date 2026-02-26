@@ -1,3 +1,4 @@
+pub mod ci;
 pub mod error;
 pub mod types;
 pub mod discovery;

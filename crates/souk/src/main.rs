@@ -5,7 +5,7 @@ mod output;
 use std::path::PathBuf;
 
 use clap::Parser;
-use cli::{Cli, ColorMode, Commands, ValidateTarget};
+use cli::{Cli, CiAction, CiHook, ColorMode, Commands, ValidateTarget};
 use output::{OutputMode, Reporter};
 use souk_core::discovery::{discover_marketplace, load_marketplace_config, MarketplaceConfig};
 
@@ -91,6 +91,20 @@ fn main() {
                 }
                 None => false,
             }
+        }
+        Commands::Ci {
+            action: CiAction::Run { hook },
+        } => match hook {
+            CiHook::PreCommit => {
+                commands::ci::run_pre_commit(marketplace, &mut reporter)
+            }
+            CiHook::PrePush => {
+                commands::ci::run_pre_push(marketplace, &mut reporter)
+            }
+        },
+        Commands::Ci { .. } => {
+            reporter.error("Command not yet implemented");
+            false
         }
         _ => {
             reporter.error("Command not yet implemented");
