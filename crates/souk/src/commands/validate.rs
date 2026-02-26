@@ -1,10 +1,11 @@
 use std::path::PathBuf;
 
+use indicatif::{ProgressBar, ProgressStyle};
 use souk_core::discovery::{discover_marketplace, load_marketplace_config, MarketplaceConfig};
 use souk_core::resolution::resolve_plugin;
 use souk_core::validation::{validate_marketplace, validate_plugin};
 
-use crate::output::Reporter;
+use crate::output::{OutputMode, Reporter};
 
 pub fn run_validate_plugin(
     plugins: &[String],
@@ -25,11 +26,28 @@ pub fn run_validate_plugin(
     let mut success_count = 0;
     let mut failure_count = 0;
 
+    // Show a progress bar when validating multiple plugins in Human output mode
+    let progress = if plugin_paths.len() > 1 && reporter.mode() == OutputMode::Human {
+        let pb = ProgressBar::new(plugin_paths.len() as u64);
+        pb.set_style(
+            ProgressStyle::with_template("{spinner} [{bar:40}] {pos}/{len} {msg}")
+                .unwrap()
+                .progress_chars("=> "),
+        );
+        Some(pb)
+    } else {
+        None
+    };
+
     for path in &plugin_paths {
         let plugin_name = path
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| path.display().to_string());
+
+        if let Some(pb) = &progress {
+            pb.set_message(plugin_name.clone());
+        }
 
         let result = validate_plugin(path);
 
@@ -46,6 +64,14 @@ pub fn run_validate_plugin(
                 reporter.report_validation(&result);
             }
         }
+
+        if let Some(pb) = &progress {
+            pb.inc(1);
+        }
+    }
+
+    if let Some(pb) = progress {
+        pb.finish_and_clear();
     }
 
     reporter.section("Summary");
@@ -158,7 +184,11 @@ fn collect_plugin_paths(
             let input_path = PathBuf::from(input);
 
             if input_path.is_dir() {
-                if input_path.join(".claude-plugin").join("plugin.json").is_file() {
+                if input_path
+                    .join(".claude-plugin")
+                    .join("plugin.json")
+                    .is_file()
+                {
                     paths.push(input_path);
                 } else if let Ok(entries) = std::fs::read_dir(&input_path) {
                     for entry in entries.flatten() {

@@ -305,12 +305,7 @@ mod tests {
 
     #[test]
     fn build_prompt_contains_plugin_json() {
-        let prompt = build_plugin_review_prompt(
-            r#"{"name": "foo"}"#,
-            None,
-            None,
-            &[],
-        );
+        let prompt = build_plugin_review_prompt(r#"{"name": "foo"}"#, None, None, &[]);
         assert!(prompt.contains("## plugin.json"));
         assert!(prompt.contains(r#"{"name": "foo"}"#));
     }
@@ -345,12 +340,7 @@ mod tests {
             "- commit-message (dir: git-commit)".to_string(),
             "- code-review (dir: code-review)".to_string(),
         ];
-        let prompt = build_plugin_review_prompt(
-            r#"{"name": "foo"}"#,
-            None,
-            None,
-            &skills,
-        );
+        let prompt = build_plugin_review_prompt(r#"{"name": "foo"}"#, None, None, &skills);
         assert!(prompt.contains("## Skills"));
         assert!(prompt.contains("commit-message"));
         assert!(prompt.contains("code-review"));
@@ -358,12 +348,7 @@ mod tests {
 
     #[test]
     fn build_prompt_omits_optional_sections_when_absent() {
-        let prompt = build_plugin_review_prompt(
-            r#"{"name": "foo"}"#,
-            None,
-            None,
-            &[],
-        );
+        let prompt = build_plugin_review_prompt(r#"{"name": "foo"}"#, None, None, &[]);
         assert!(!prompt.contains("## extends-plugin.json"));
         assert!(!prompt.contains("## README.md"));
         assert!(!prompt.contains("## Skills"));
@@ -371,12 +356,7 @@ mod tests {
 
     #[test]
     fn build_prompt_requests_all_review_sections() {
-        let prompt = build_plugin_review_prompt(
-            r#"{"name": "foo"}"#,
-            None,
-            None,
-            &[],
-        );
+        let prompt = build_plugin_review_prompt(r#"{"name": "foo"}"#, None, None, &[]);
         assert!(prompt.contains("Executive Summary"));
         assert!(prompt.contains("Component Analysis"));
         assert!(prompt.contains("Code Quality Assessment"));

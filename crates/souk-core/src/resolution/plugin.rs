@@ -18,12 +18,7 @@ pub fn resolve_plugin(
             return relative.canonicalize().map_err(SoukError::Io);
         }
 
-        if let Some(entry) = config
-            .marketplace
-            .plugins
-            .iter()
-            .find(|p| p.name == input)
-        {
+        if let Some(entry) = config.marketplace.plugins.iter().find(|p| p.name == input) {
             let resolved = resolve_source(&entry.source, config)?;
             if resolved.is_dir() {
                 return resolved.canonicalize().map_err(SoukError::Io);
@@ -34,10 +29,7 @@ pub fn resolve_plugin(
     Err(SoukError::PluginNotFound(input.to_string()))
 }
 
-pub fn resolve_source(
-    source: &str,
-    config: &MarketplaceConfig,
-) -> Result<PathBuf, SoukError> {
+pub fn resolve_source(source: &str, config: &MarketplaceConfig) -> Result<PathBuf, SoukError> {
     if source.starts_with('/') {
         Ok(PathBuf::from(source))
     } else if source.starts_with("./") || source.starts_with("../") {
@@ -47,10 +39,7 @@ pub fn resolve_source(
     }
 }
 
-pub fn plugin_path_to_source(
-    path: &Path,
-    config: &MarketplaceConfig,
-) -> (String, bool) {
+pub fn plugin_path_to_source(path: &Path, config: &MarketplaceConfig) -> (String, bool) {
     let canon_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let canon_root = &config.plugin_root_abs;
 
@@ -150,8 +139,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup(&tmp);
         let external = TempDir::new().unwrap();
-        let (source, is_internal) =
-            plugin_path_to_source(external.path(), &config);
+        let (source, is_internal) = plugin_path_to_source(external.path(), &config);
         assert!(!is_internal);
         assert!(source.starts_with('/'));
     }

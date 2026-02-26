@@ -37,14 +37,7 @@ mod tests {
 
     #[test]
     fn invalid_constraints() {
-        let invalid = [
-            "",
-            "latest",
-            "1.0",
-            "^1.0",
-            ">>1.0.0",
-            "1.0.0.0",
-        ];
+        let invalid = ["", "latest", "1.0", "^1.0", ">>1.0.0", "1.0.0.0"];
         for v in invalid {
             assert!(!is_valid_version_constraint(v), "should be invalid: {v}");
         }

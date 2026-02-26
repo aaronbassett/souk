@@ -225,8 +225,7 @@ pub fn execute_add(
                 )));
             }
 
-            if matches!(action.conflict, Some(ConflictResolution::Replace)) && target_dir.exists()
-            {
+            if matches!(action.conflict, Some(ConflictResolution::Replace)) && target_dir.exists() {
                 fs::remove_dir_all(&target_dir)?;
             }
 
@@ -246,14 +245,10 @@ pub fn execute_add(
         let (final_name, final_source) = match &action.conflict {
             Some(ConflictResolution::Replace) => {
                 // Remove existing entry
-                marketplace
-                    .plugins
-                    .retain(|p| p.name != action.plugin_name);
+                marketplace.plugins.retain(|p| p.name != action.plugin_name);
                 (action.plugin_name.clone(), action.source.clone())
             }
-            Some(ConflictResolution::Rename(new_name)) => {
-                (new_name.clone(), new_name.clone())
-            }
+            Some(ConflictResolution::Rename(new_name)) => (new_name.clone(), new_name.clone()),
             Some(ConflictResolution::Skip) => continue,
             None => (action.plugin_name.clone(), action.source.clone()),
         };
@@ -310,9 +305,7 @@ fn resolve_plugin_input(input: &str, config: &MarketplaceConfig) -> Result<PathB
 
 /// Reads and parses plugin.json from a plugin directory.
 fn read_plugin_manifest(plugin_path: &Path) -> Result<PluginManifest, SoukError> {
-    let plugin_json = plugin_path
-        .join(".claude-plugin")
-        .join("plugin.json");
+    let plugin_json = plugin_path.join(".claude-plugin").join("plugin.json");
 
     let content = fs::read_to_string(&plugin_json).map_err(|e| {
         SoukError::Other(format!(
@@ -354,9 +347,8 @@ mod tests {
         let plugins_dir = tmp.path().join("plugins");
         fs::create_dir_all(&plugins_dir).unwrap();
 
-        let mp_json = format!(
-            r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{plugins_json}]}}"#
-        );
+        let mp_json =
+            format!(r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{plugins_json}]}}"#);
         fs::write(claude_dir.join("marketplace.json"), &mp_json).unwrap();
         load_marketplace_config(&claude_dir.join("marketplace.json")).unwrap()
     }
@@ -384,13 +376,7 @@ mod tests {
         // Create a plugin inside pluginRoot
         create_plugin(&config.plugin_root_abs, "my-plugin");
 
-        let plan = plan_add(
-            &["my-plugin".to_string()],
-            &config,
-            "abort",
-            false,
-        )
-        .unwrap();
+        let plan = plan_add(&["my-plugin".to_string()], &config, "abort", false).unwrap();
 
         assert_eq!(plan.actions.len(), 1);
         assert_eq!(plan.actions[0].plugin_name, "my-plugin");
@@ -413,18 +399,11 @@ mod tests {
     #[test]
     fn add_with_conflict_abort_strategy() {
         let tmp = TempDir::new().unwrap();
-        let config = setup_marketplace(
-            &tmp,
-            r#"{"name":"existing","source":"existing","tags":[]}"#,
-        );
+        let config =
+            setup_marketplace(&tmp, r#"{"name":"existing","source":"existing","tags":[]}"#);
         create_plugin(&config.plugin_root_abs, "existing");
 
-        let result = plan_add(
-            &["existing".to_string()],
-            &config,
-            "abort",
-            false,
-        );
+        let result = plan_add(&["existing".to_string()], &config, "abort", false);
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -436,19 +415,11 @@ mod tests {
     #[test]
     fn add_with_skip_strategy() {
         let tmp = TempDir::new().unwrap();
-        let config = setup_marketplace(
-            &tmp,
-            r#"{"name":"existing","source":"existing","tags":[]}"#,
-        );
+        let config =
+            setup_marketplace(&tmp, r#"{"name":"existing","source":"existing","tags":[]}"#);
         create_plugin(&config.plugin_root_abs, "existing");
 
-        let plan = plan_add(
-            &["existing".to_string()],
-            &config,
-            "skip",
-            false,
-        )
-        .unwrap();
+        let plan = plan_add(&["existing".to_string()], &config, "skip", false).unwrap();
 
         assert_eq!(plan.actions.len(), 1);
         assert!(matches!(
@@ -476,13 +447,7 @@ mod tests {
         );
         create_plugin(&config.plugin_root_abs, "existing");
 
-        let plan = plan_add(
-            &["existing".to_string()],
-            &config,
-            "replace",
-            false,
-        )
-        .unwrap();
+        let plan = plan_add(&["existing".to_string()], &config, "replace", false).unwrap();
 
         assert_eq!(plan.actions.len(), 1);
         assert!(matches!(
@@ -504,19 +469,11 @@ mod tests {
     #[test]
     fn add_with_rename_strategy() {
         let tmp = TempDir::new().unwrap();
-        let config = setup_marketplace(
-            &tmp,
-            r#"{"name":"existing","source":"existing","tags":[]}"#,
-        );
+        let config =
+            setup_marketplace(&tmp, r#"{"name":"existing","source":"existing","tags":[]}"#);
         create_plugin(&config.plugin_root_abs, "existing");
 
-        let plan = plan_add(
-            &["existing".to_string()],
-            &config,
-            "rename",
-            false,
-        )
-        .unwrap();
+        let plan = plan_add(&["existing".to_string()], &config, "rename", false).unwrap();
 
         assert_eq!(plan.actions.len(), 1);
         match &plan.actions[0].conflict {
@@ -533,13 +490,7 @@ mod tests {
         let config = setup_marketplace(&tmp, "");
         create_plugin(&config.plugin_root_abs, "my-plugin");
 
-        let plan = plan_add(
-            &["my-plugin".to_string()],
-            &config,
-            "abort",
-            false,
-        )
-        .unwrap();
+        let plan = plan_add(&["my-plugin".to_string()], &config, "abort", false).unwrap();
 
         let added = execute_add(&plan, &config, true).unwrap();
         assert_eq!(added, vec!["my-plugin"]);

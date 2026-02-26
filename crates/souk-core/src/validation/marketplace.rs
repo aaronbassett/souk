@@ -148,11 +148,7 @@ mod tests {
     use crate::discovery::load_marketplace_config;
     use tempfile::TempDir;
 
-    fn setup_marketplace(
-        tmp: &TempDir,
-        json: &str,
-        plugin_dirs: &[&str],
-    ) -> MarketplaceConfig {
+    fn setup_marketplace(tmp: &TempDir, json: &str, plugin_dirs: &[&str]) -> MarketplaceConfig {
         let claude = tmp.path().join(".claude-plugin");
         std::fs::create_dir_all(&claude).unwrap();
         let plugins = tmp.path().join("plugins");

@@ -12,9 +12,7 @@ pub struct MarketplaceConfig {
 }
 
 pub fn discover_marketplace(start_dir: &Path) -> Result<PathBuf, SoukError> {
-    let mut current = start_dir
-        .canonicalize()
-        .map_err(SoukError::Io)?;
+    let mut current = start_dir.canonicalize().map_err(SoukError::Io)?;
 
     loop {
         let candidate = current.join(".claude-plugin").join("marketplace.json");
@@ -38,9 +36,7 @@ pub fn discover_marketplace(start_dir: &Path) -> Result<PathBuf, SoukError> {
 }
 
 pub fn load_marketplace_config(marketplace_path: &Path) -> Result<MarketplaceConfig, SoukError> {
-    let marketplace_path = marketplace_path
-        .canonicalize()
-        .map_err(SoukError::Io)?;
+    let marketplace_path = marketplace_path.canonicalize().map_err(SoukError::Io)?;
 
     let content = std::fs::read_to_string(&marketplace_path)?;
     let marketplace: Marketplace = serde_json::from_str(&content)?;
@@ -54,14 +50,15 @@ pub fn load_marketplace_config(marketplace_path: &Path) -> Result<MarketplaceCon
         .to_path_buf();
 
     let plugin_root_rel = marketplace.normalized_plugin_root();
-    let plugin_root_abs = project_root.join(&plugin_root_rel).canonicalize().map_err(
-        |_| {
+    let plugin_root_abs = project_root
+        .join(&plugin_root_rel)
+        .canonicalize()
+        .map_err(|_| {
             SoukError::Other(format!(
                 "Plugin root directory not found: {}",
                 project_root.join(&plugin_root_rel).display()
             ))
-        },
-    )?;
+        })?;
 
     Ok(MarketplaceConfig {
         marketplace_path,

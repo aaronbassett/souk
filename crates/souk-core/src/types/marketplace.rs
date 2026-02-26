@@ -14,7 +14,10 @@ pub struct PluginEntry {
 #[serde(rename_all = "camelCase")]
 pub struct Marketplace {
     pub version: String,
-    #[serde(default = "default_plugin_root", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default = "default_plugin_root",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub plugin_root: Option<String>,
     pub plugins: Vec<PluginEntry>,
 }

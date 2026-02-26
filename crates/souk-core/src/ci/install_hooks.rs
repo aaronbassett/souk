@@ -160,10 +160,7 @@ fn install_lefthook(project_root: &Path) -> Result<String, SoukError> {
     let new_content = format!("{existing}{LEFTHOOK_SNIPPET}");
     fs::write(&config_path, new_content)?;
 
-    Ok(format!(
-        "Appended souk hooks to {}",
-        config_path.display()
-    ))
+    Ok(format!("Appended souk hooks to {}", config_path.display()))
 }
 
 /// Husky hook script content (no shebang needed for Husky v9+).
@@ -327,20 +324,15 @@ fn install_simple_git_hooks(project_root: &Path) -> Result<String, SoukError> {
         let parsed: Result<serde_json::Value, _> = serde_json::from_str(&existing);
         match parsed {
             Ok(serde_json::Value::Object(mut map)) => {
-                map.entry("pre-commit")
-                    .or_insert(serde_json::Value::String(
-                        "souk ci run pre-commit".to_string(),
-                    ));
-                map.entry("pre-push")
-                    .or_insert(serde_json::Value::String(
-                        "souk ci run pre-push".to_string(),
-                    ));
+                map.entry("pre-commit").or_insert(serde_json::Value::String(
+                    "souk ci run pre-commit".to_string(),
+                ));
+                map.entry("pre-push").or_insert(serde_json::Value::String(
+                    "souk ci run pre-push".to_string(),
+                ));
                 let new_content = serde_json::to_string_pretty(&map)?;
                 fs::write(&config_path, format!("{new_content}\n"))?;
-                Ok(format!(
-                    "Merged souk hooks into {}",
-                    config_path.display()
-                ))
+                Ok(format!("Merged souk hooks into {}", config_path.display()))
             }
             _ => Ok(format!(
                 "Could not parse {}. {SIMPLE_GIT_HOOKS_NOTE}",
@@ -368,20 +360,14 @@ mod tests {
     fn detect_hook_manager_finds_lefthook_yml() {
         let tmp = TempDir::new().unwrap();
         fs::write(tmp.path().join("lefthook.yml"), "").unwrap();
-        assert_eq!(
-            detect_hook_manager(tmp.path()),
-            Some(HookManager::Lefthook)
-        );
+        assert_eq!(detect_hook_manager(tmp.path()), Some(HookManager::Lefthook));
     }
 
     #[test]
     fn detect_hook_manager_finds_lefthook_yaml() {
         let tmp = TempDir::new().unwrap();
         fs::write(tmp.path().join("lefthook.yaml"), "").unwrap();
-        assert_eq!(
-            detect_hook_manager(tmp.path()),
-            Some(HookManager::Lefthook)
-        );
+        assert_eq!(detect_hook_manager(tmp.path()), Some(HookManager::Lefthook));
     }
 
     #[test]
@@ -592,11 +578,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let husky_dir = tmp.path().join(".husky");
         fs::create_dir(&husky_dir).unwrap();
-        fs::write(
-            husky_dir.join("pre-commit"),
-            "souk ci run pre-commit\n",
-        )
-        .unwrap();
+        fs::write(husky_dir.join("pre-commit"), "souk ci run pre-commit\n").unwrap();
 
         let result = install_husky(tmp.path()).unwrap();
         assert!(result.contains("Already configured"));

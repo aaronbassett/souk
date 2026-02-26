@@ -3,10 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::error::SoukError;
 use crate::types::skill::{parse_skill_name_from_frontmatter, SkillMetadata};
 
-pub fn resolve_skill(
-    plugin_path: &Path,
-    input: &str,
-) -> Result<PathBuf, SoukError> {
+pub fn resolve_skill(plugin_path: &Path, input: &str) -> Result<PathBuf, SoukError> {
     let plugin_name = plugin_path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
@@ -31,10 +28,7 @@ pub fn resolve_skill(
                     if let Ok(content) = std::fs::read_to_string(&skill_md) {
                         if let Some(name) = parse_skill_name_from_frontmatter(&content) {
                             if name == input {
-                                return entry
-                                    .path()
-                                    .canonicalize()
-                                    .map_err(SoukError::Io);
+                                return entry.path().canonicalize().map_err(SoukError::Io);
                             }
                         }
                     }

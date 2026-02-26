@@ -89,10 +89,7 @@ pub fn review_marketplace(
 }
 
 /// Build the structured review prompt sent to the LLM.
-fn build_marketplace_review_prompt(
-    marketplace_json: &str,
-    plugin_summaries: &[String],
-) -> String {
+fn build_marketplace_review_prompt(marketplace_json: &str, plugin_summaries: &[String]) -> String {
     let mut prompt = String::new();
     prompt.push_str(
         "You are a senior code reviewer. Review this Claude Code plugin marketplace \
@@ -129,7 +126,10 @@ mod tests {
     use tempfile::TempDir;
 
     /// Helper: create a realistic marketplace on disk and return a `MarketplaceConfig`.
-    fn setup_marketplace_config(tmp: &TempDir, plugins: &[(&str, Option<&str>)]) -> MarketplaceConfig {
+    fn setup_marketplace_config(
+        tmp: &TempDir,
+        plugins: &[(&str, Option<&str>)],
+    ) -> MarketplaceConfig {
         let plugins_dir = tmp.path().join("plugins");
         std::fs::create_dir_all(&plugins_dir).unwrap();
 
@@ -187,17 +187,17 @@ mod tests {
     #[test]
     fn review_marketplace_saves_report_to_output_dir() {
         let tmp = TempDir::new().unwrap();
-        let config = setup_marketplace_config(
-            &tmp,
-            &[("alpha", Some(r#"{"name": "alpha"}"#))],
-        );
+        let config = setup_marketplace_config(&tmp, &[("alpha", Some(r#"{"name": "alpha"}"#))]);
 
         let output_dir = tmp.path().join("reviews");
         let provider = MockProvider::new("Overall: solid marketplace.");
         let report = review_marketplace(&config, &provider, Some(&output_dir)).unwrap();
 
         let report_path = output_dir.join("marketplace-review-report.md");
-        assert!(report_path.exists(), "Report file should be written to disk");
+        assert!(
+            report_path.exists(),
+            "Report file should be written to disk"
+        );
 
         let content = std::fs::read_to_string(&report_path).unwrap();
         assert!(content.contains("# Marketplace Review"));
@@ -214,7 +214,10 @@ mod tests {
         let provider = MockProvider::new("Empty marketplace, structure looks fine.");
         let report = review_marketplace(&config, &provider, None).unwrap();
 
-        assert_eq!(report.review_text, "Empty marketplace, structure looks fine.");
+        assert_eq!(
+            report.review_text,
+            "Empty marketplace, structure looks fine."
+        );
         assert_eq!(report.provider_name, "mock");
     }
 

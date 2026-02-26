@@ -238,16 +238,12 @@ mod tests {
     #[test]
     fn unique_name_base_conflict() {
         let existing: HashSet<String> = ["my-plugin".into()].into();
-        assert_eq!(
-            generate_unique_name("my-plugin", &existing),
-            "my-plugin-2"
-        );
+        assert_eq!(generate_unique_name("my-plugin", &existing), "my-plugin-2");
     }
 
     #[test]
     fn unique_name_multiple_conflicts() {
-        let existing: HashSet<String> =
-            ["foo".into(), "foo-2".into(), "foo-3".into()].into();
+        let existing: HashSet<String> = ["foo".into(), "foo-2".into(), "foo-3".into()].into();
         assert_eq!(generate_unique_name("foo", &existing), "foo-4");
     }
 

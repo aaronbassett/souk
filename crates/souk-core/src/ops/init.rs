@@ -144,7 +144,10 @@ mod tests {
 
         scaffold_marketplace(&root, "./plugins").unwrap();
 
-        assert!(root.join(".claude-plugin").join("marketplace.json").is_file());
+        assert!(root
+            .join(".claude-plugin")
+            .join("marketplace.json")
+            .is_file());
         assert!(root.join("plugins").is_dir());
     }
 

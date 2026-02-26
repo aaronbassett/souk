@@ -14,10 +14,7 @@ pub fn run_init(target_path: &str, plugin_root: &str, reporter: &mut Reporter) -
 
     match scaffold_marketplace(path, plugin_root) {
         Ok(()) => {
-            reporter.success(&format!(
-                "Marketplace initialized at {}",
-                path.display()
-            ));
+            reporter.success(&format!("Marketplace initialized at {}", path.display()));
             reporter.info(&format!(
                 "Created .claude-plugin/marketplace.json with pluginRoot: {plugin_root}"
             ));

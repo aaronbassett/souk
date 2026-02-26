@@ -62,9 +62,7 @@ pub fn update_plugins(
             let plugin_json_path = plugin_path.join(".claude-plugin").join("plugin.json");
 
             let content = fs::read_to_string(&plugin_json_path).map_err(|e| {
-                SoukError::Other(format!(
-                    "Cannot read plugin.json for {name}: {e}"
-                ))
+                SoukError::Other(format!("Cannot read plugin.json for {name}: {e}"))
             })?;
 
             // Parse as generic JSON to preserve all fields
@@ -76,9 +74,7 @@ pub fn update_plugins(
                     "minor" => bump_minor(version)?,
                     "patch" => bump_patch(version)?,
                     _ => {
-                        return Err(SoukError::Other(format!(
-                            "Invalid bump type: {bump}"
-                        )));
+                        return Err(SoukError::Other(format!("Invalid bump type: {bump}")));
                     }
                 };
                 doc["version"] = serde_json::Value::String(new_version);
@@ -109,11 +105,8 @@ pub fn update_plugins(
         let plugin_path = resolve_source(&source, config)?;
         let plugin_json_path = plugin_path.join(".claude-plugin").join("plugin.json");
 
-        let pj_content = fs::read_to_string(&plugin_json_path).map_err(|e| {
-            SoukError::Other(format!(
-                "Cannot read plugin.json for {name}: {e}"
-            ))
-        })?;
+        let pj_content = fs::read_to_string(&plugin_json_path)
+            .map_err(|e| SoukError::Other(format!("Cannot read plugin.json for {name}: {e}")))?;
 
         let manifest: PluginManifest = serde_json::from_str(&pj_content)?;
 
@@ -168,10 +161,7 @@ mod tests {
     use crate::discovery::load_marketplace_config;
     use tempfile::TempDir;
 
-    fn setup_marketplace_with_plugins(
-        tmp: &TempDir,
-        plugin_names: &[&str],
-    ) -> MarketplaceConfig {
+    fn setup_marketplace_with_plugins(tmp: &TempDir, plugin_names: &[&str]) -> MarketplaceConfig {
         let claude_dir = tmp.path().join(".claude-plugin");
         fs::create_dir_all(&claude_dir).unwrap();
         let plugins_dir = tmp.path().join("plugins");
@@ -196,9 +186,8 @@ mod tests {
         }
 
         let plugins_json = entries.join(",");
-        let mp_json = format!(
-            r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{plugins_json}]}}"#
-        );
+        let mp_json =
+            format!(r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{plugins_json}]}}"#);
         fs::write(claude_dir.join("marketplace.json"), &mp_json).unwrap();
         load_marketplace_config(&claude_dir.join("marketplace.json")).unwrap()
     }
@@ -212,12 +201,7 @@ mod tests {
         assert_eq!(config.marketplace.plugins[0].tags, vec!["old"]);
 
         // Update should refresh tags from plugin.json (which has "original")
-        let updated = update_plugins(
-            &["alpha".to_string()],
-            None,
-            &config,
-        )
-        .unwrap();
+        let updated = update_plugins(&["alpha".to_string()], None, &config).unwrap();
 
         assert_eq!(updated, vec!["alpha"]);
 
@@ -232,12 +216,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
 
-        let updated = update_plugins(
-            &["alpha".to_string()],
-            Some("patch"),
-            &config,
-        )
-        .unwrap();
+        let updated = update_plugins(&["alpha".to_string()], Some("patch"), &config).unwrap();
 
         assert_eq!(updated, vec!["alpha"]);
 
@@ -257,12 +236,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
 
-        update_plugins(
-            &["alpha".to_string()],
-            Some("major"),
-            &config,
-        )
-        .unwrap();
+        update_plugins(&["alpha".to_string()], Some("major"), &config).unwrap();
 
         let plugin_json_path = config
             .plugin_root_abs
@@ -279,12 +253,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
 
-        update_plugins(
-            &["alpha".to_string()],
-            Some("minor"),
-            &config,
-        )
-        .unwrap();
+        update_plugins(&["alpha".to_string()], Some("minor"), &config).unwrap();
 
         let plugin_json_path = config
             .plugin_root_abs
@@ -301,11 +270,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
 
-        let result = update_plugins(
-            &["nonexistent".to_string()],
-            None,
-            &config,
-        );
+        let result = update_plugins(&["nonexistent".to_string()], None, &config);
 
         assert!(result.is_err());
         match result.unwrap_err() {

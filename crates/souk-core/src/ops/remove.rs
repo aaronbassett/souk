@@ -109,10 +109,7 @@ mod tests {
     use crate::discovery::load_marketplace_config;
     use tempfile::TempDir;
 
-    fn setup_marketplace_with_plugins(
-        tmp: &TempDir,
-        plugin_names: &[&str],
-    ) -> MarketplaceConfig {
+    fn setup_marketplace_with_plugins(tmp: &TempDir, plugin_names: &[&str]) -> MarketplaceConfig {
         let claude_dir = tmp.path().join(".claude-plugin");
         fs::create_dir_all(&claude_dir).unwrap();
         let plugins_dir = tmp.path().join("plugins");
@@ -126,9 +123,7 @@ mod tests {
             fs::create_dir_all(&plugin_claude).unwrap();
             fs::write(
                 plugin_claude.join("plugin.json"),
-                format!(
-                    r#"{{"name":"{name}","version":"1.0.0","description":"test plugin"}}"#
-                ),
+                format!(r#"{{"name":"{name}","version":"1.0.0","description":"test plugin"}}"#),
             )
             .unwrap();
 
@@ -136,9 +131,8 @@ mod tests {
         }
 
         let plugins_json = entries.join(",");
-        let mp_json = format!(
-            r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{plugins_json}]}}"#
-        );
+        let mp_json =
+            format!(r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{plugins_json}]}}"#);
         fs::write(claude_dir.join("marketplace.json"), &mp_json).unwrap();
         load_marketplace_config(&claude_dir.join("marketplace.json")).unwrap()
     }
@@ -148,12 +142,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha", "beta"]);
 
-        let removed = remove_plugins(
-            &["alpha".to_string()],
-            false,
-            &config,
-        )
-        .unwrap();
+        let removed = remove_plugins(&["alpha".to_string()], false, &config).unwrap();
 
         assert_eq!(removed, vec!["alpha"]);
 
@@ -172,11 +161,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
 
-        let result = remove_plugins(
-            &["nonexistent".to_string()],
-            false,
-            &config,
-        );
+        let result = remove_plugins(&["nonexistent".to_string()], false, &config);
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -230,12 +215,8 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha", "beta", "gamma"]);
 
-        let removed = remove_plugins(
-            &["alpha".to_string(), "gamma".to_string()],
-            false,
-            &config,
-        )
-        .unwrap();
+        let removed =
+            remove_plugins(&["alpha".to_string(), "gamma".to_string()], false, &config).unwrap();
 
         assert_eq!(removed.len(), 2);
 

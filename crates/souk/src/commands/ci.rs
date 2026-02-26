@@ -101,9 +101,7 @@ pub fn run_ci_install(target: &CiInstallTarget, reporter: &mut Reporter) -> bool
                         m
                     }
                     None => {
-                        reporter.info(
-                            "No hook manager detected, defaulting to native git hooks",
-                        );
+                        reporter.info("No hook manager detected, defaulting to native git hooks");
                         HookManager::Native
                     }
                 }
@@ -150,9 +148,7 @@ pub fn run_ci_install(target: &CiInstallTarget, reporter: &mut Reporter) -> bool
                         p
                     }
                     None => {
-                        reporter.info(
-                            "No CI provider detected, defaulting to GitHub Actions",
-                        );
+                        reporter.info("No CI provider detected, defaulting to GitHub Actions");
                         CiProvider::GitHub
                     }
                 }

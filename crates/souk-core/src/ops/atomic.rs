@@ -181,7 +181,10 @@ mod tests {
         let (_dir, file_path) = setup_file(r#"{"version":"1.0.0"}"#);
 
         let guard = AtomicGuard::new(&file_path).expect("guard creation failed");
-        let backup = guard.backup_path().expect("expected a backup path").to_path_buf();
+        let backup = guard
+            .backup_path()
+            .expect("expected a backup path")
+            .to_path_buf();
 
         assert!(backup.exists(), "backup should exist before commit");
 
@@ -209,8 +212,7 @@ mod tests {
 
         let restored = fs::read_to_string(&file_path).unwrap();
         assert_eq!(
-            restored,
-            r#"{"version":"1.0.0"}"#,
+            restored, r#"{"version":"1.0.0"}"#,
             "original file should be restored after drop"
         );
     }
@@ -231,8 +233,7 @@ mod tests {
 
         let content = fs::read_to_string(&file_path).unwrap();
         assert_eq!(
-            content,
-            r#"{"version":"2.0.0"}"#,
+            content, r#"{"version":"2.0.0"}"#,
             "committed mutation should persist"
         );
     }

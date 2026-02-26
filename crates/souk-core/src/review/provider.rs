@@ -285,8 +285,7 @@ pub fn detect_provider(
     if let Some(provider_name) = provider_override {
         return match provider_name {
             "anthropic" => {
-                let key =
-                    std::env::var("ANTHROPIC_API_KEY").map_err(|_| SoukError::NoApiKey)?;
+                let key = std::env::var("ANTHROPIC_API_KEY").map_err(|_| SoukError::NoApiKey)?;
                 Ok(Box::new(AnthropicProvider::new(key, model)))
             }
             "openai" => {
@@ -436,7 +435,10 @@ mod tests {
         let result = detect_provider(Some("unknown-provider"), None);
         match result {
             Err(SoukError::Other(msg)) => {
-                assert!(msg.contains("Unknown provider"), "Unexpected message: {msg}");
+                assert!(
+                    msg.contains("Unknown provider"),
+                    "Unexpected message: {msg}"
+                );
             }
             Err(other) => panic!("Expected Other, got: {other:?}"),
             Ok(_) => panic!("Expected error, got Ok"),

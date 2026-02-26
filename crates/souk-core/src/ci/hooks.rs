@@ -167,9 +167,7 @@ mod tests {
             std::fs::create_dir_all(&p).unwrap();
             std::fs::write(
                 p.join("plugin.json"),
-                format!(
-                    r#"{{"name":"{name}","version":"1.0.0","description":"test plugin"}}"#
-                ),
+                format!(r#"{{"name":"{name}","version":"1.0.0","description":"test plugin"}}"#),
             )
             .unwrap();
         }
@@ -183,9 +181,7 @@ mod tests {
 
         std::fs::write(
             claude_dir.join("marketplace.json"),
-            format!(
-                r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{plugins_arr}]}}"#
-            ),
+            format!(r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{plugins_arr}]}}"#),
         )
         .unwrap();
 
@@ -195,8 +191,7 @@ mod tests {
     #[test]
     fn pre_push_validates_entire_marketplace() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["my-plugin"], &[("my-plugin", "my-plugin")]);
+        let config = setup_git_marketplace(&tmp, &["my-plugin"], &[("my-plugin", "my-plugin")]);
 
         let result = run_pre_push(&config);
         assert!(
@@ -209,8 +204,7 @@ mod tests {
     #[test]
     fn pre_push_catches_invalid_plugin() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["bad-plugin"], &[("bad-plugin", "bad-plugin")]);
+        let config = setup_git_marketplace(&tmp, &["bad-plugin"], &[("bad-plugin", "bad-plugin")]);
 
         // Corrupt the plugin.json to trigger a validation error
         let plugin_json = tmp
@@ -225,8 +219,7 @@ mod tests {
     #[test]
     fn pre_commit_returns_empty_when_no_staged_changes() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["my-plugin"], &[("my-plugin", "my-plugin")]);
+        let config = setup_git_marketplace(&tmp, &["my-plugin"], &[("my-plugin", "my-plugin")]);
 
         // No files staged, so pre-commit should produce no diagnostics
         let result = run_pre_commit(&config);
@@ -245,8 +238,7 @@ mod tests {
     #[test]
     fn detect_changed_plugins_with_no_staged_files() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
+        let config = setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
 
         let changed = detect_changed_plugins(&config).unwrap();
         assert!(changed.is_empty());
@@ -255,8 +247,11 @@ mod tests {
     #[test]
     fn detect_changed_plugins_with_staged_plugin_file() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["alpha", "beta"], &[("alpha", "alpha"), ("beta", "beta")]);
+        let config = setup_git_marketplace(
+            &tmp,
+            &["alpha", "beta"],
+            &[("alpha", "alpha"), ("beta", "beta")],
+        );
 
         // Stage a file inside alpha plugin
         let test_file = tmp.path().join("plugins/alpha/test.txt");
@@ -274,8 +269,7 @@ mod tests {
     #[test]
     fn detect_changed_plugins_deduplicates() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
+        let config = setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
 
         // Stage two files inside the same plugin
         let file1 = tmp.path().join("plugins/alpha/a.txt");
@@ -295,8 +289,7 @@ mod tests {
     #[test]
     fn is_marketplace_staged_returns_false_when_not_staged() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
+        let config = setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
 
         assert!(!is_marketplace_staged(&config).unwrap());
     }
@@ -304,8 +297,7 @@ mod tests {
     #[test]
     fn is_marketplace_staged_returns_true_when_staged() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
+        let config = setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
 
         // Stage the marketplace.json
         Command::new("git")
@@ -320,8 +312,7 @@ mod tests {
     #[test]
     fn pre_commit_validates_staged_plugin() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
+        let config = setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
 
         // Stage a file in alpha
         let test_file = tmp.path().join("plugins/alpha/readme.txt");
@@ -344,13 +335,10 @@ mod tests {
     #[test]
     fn pre_commit_catches_invalid_staged_plugin() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["broken"], &[("broken", "broken")]);
+        let config = setup_git_marketplace(&tmp, &["broken"], &[("broken", "broken")]);
 
         // Corrupt the plugin
-        let plugin_json = tmp
-            .path()
-            .join("plugins/broken/.claude-plugin/plugin.json");
+        let plugin_json = tmp.path().join("plugins/broken/.claude-plugin/plugin.json");
         std::fs::write(&plugin_json, "not json").unwrap();
 
         // Stage a file in broken
@@ -369,8 +357,7 @@ mod tests {
     #[test]
     fn pre_commit_validates_marketplace_when_staged() {
         let tmp = TempDir::new().unwrap();
-        let config =
-            setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
+        let config = setup_git_marketplace(&tmp, &["alpha"], &[("alpha", "alpha")]);
 
         // Stage marketplace.json
         Command::new("git")

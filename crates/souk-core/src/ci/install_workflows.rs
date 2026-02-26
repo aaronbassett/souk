@@ -277,7 +277,9 @@ fn install_buildkite_config(project_root: &Path) -> Result<String, SoukError> {
 
     if pipeline_path.exists() {
         let existing = fs::read_to_string(&pipeline_path)?;
-        if existing.contains("souk validate marketplace") || existing.contains("Validate Marketplace") {
+        if existing.contains("souk validate marketplace")
+            || existing.contains("Validate Marketplace")
+        {
             return Ok(format!(
                 "Buildkite souk validation step already exists in {}",
                 pipeline_path.display()
@@ -467,7 +469,11 @@ mod tests {
         let tmp = TempDir::new().unwrap();
 
         // All three should create the same GitHub workflow file
-        for provider in &[CiProvider::GitHub, CiProvider::Blacksmith, CiProvider::Northflank] {
+        for provider in &[
+            CiProvider::GitHub,
+            CiProvider::Blacksmith,
+            CiProvider::Northflank,
+        ] {
             let tmp_inner = TempDir::new().unwrap();
             let result = install_workflow(tmp_inner.path(), provider).unwrap();
             assert!(result.contains("GitHub Actions workflow"));

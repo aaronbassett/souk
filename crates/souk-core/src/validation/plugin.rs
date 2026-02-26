@@ -31,8 +31,7 @@ pub fn validate_plugin(plugin_path: &Path) -> ValidationResult {
 
     if !claude_dir.is_dir() {
         result.push(
-            ValidationDiagnostic::error("Missing .claude-plugin directory")
-                .with_path(plugin_path),
+            ValidationDiagnostic::error("Missing .claude-plugin directory").with_path(plugin_path),
         );
         return result;
     }
@@ -40,9 +39,7 @@ pub fn validate_plugin(plugin_path: &Path) -> ValidationResult {
     let plugin_json_path = claude_dir.join("plugin.json");
 
     if !plugin_json_path.is_file() {
-        result.push(
-            ValidationDiagnostic::error("Missing plugin.json").with_path(&claude_dir),
-        );
+        result.push(ValidationDiagnostic::error("Missing plugin.json").with_path(&claude_dir));
         return result;
     }
 

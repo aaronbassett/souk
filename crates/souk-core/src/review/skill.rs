@@ -269,8 +269,7 @@ mod tests {
         let output_dir = tmp.path().join("reviews");
         let provider = MockProvider::new("Review output here.");
 
-        let reports =
-            review_skills(&plugin, &[], true, &provider, Some(&output_dir)).unwrap();
+        let reports = review_skills(&plugin, &[], true, &provider, Some(&output_dir)).unwrap();
 
         assert_eq!(reports.len(), 2);
 
@@ -301,10 +300,7 @@ mod tests {
         assert!(result.is_err());
         match result.unwrap_err() {
             SoukError::Other(msg) => {
-                assert!(
-                    msg.contains("No skills found"),
-                    "Unexpected message: {msg}"
-                );
+                assert!(msg.contains("No skills found"), "Unexpected message: {msg}");
             }
             other => panic!("Expected Other with 'No skills found', got: {other:?}"),
         }
@@ -325,7 +321,10 @@ mod tests {
                     msg.contains("No skills specified"),
                     "Unexpected message: {msg}"
                 );
-                assert!(msg.contains("code-review"), "Should list code-review: {msg}");
+                assert!(
+                    msg.contains("code-review"),
+                    "Should list code-review: {msg}"
+                );
                 assert!(
                     msg.contains("commit-message"),
                     "Should list commit-message: {msg}"

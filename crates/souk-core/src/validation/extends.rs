@@ -43,10 +43,8 @@ pub fn validate_extends_plugin(plugin_path: &Path) -> ValidationResult {
         Ok(v) => v,
         Err(e) => {
             result.push(
-                ValidationDiagnostic::error(format!(
-                    "Invalid JSON in extends-plugin.json: {e}"
-                ))
-                .with_path(&extends_path),
+                ValidationDiagnostic::error(format!("Invalid JSON in extends-plugin.json: {e}"))
+                    .with_path(&extends_path),
             );
             return result;
         }
@@ -63,11 +61,9 @@ pub fn validate_extends_plugin(plugin_path: &Path) -> ValidationResult {
     for key in obj.keys() {
         if !ALLOWED_KEYS.contains(&key.as_str()) {
             result.push(
-                ValidationDiagnostic::error(format!(
-                    "Invalid key in extends-plugin.json: {key}"
-                ))
-                .with_path(&extends_path)
-                .with_field(key.clone()),
+                ValidationDiagnostic::error(format!("Invalid key in extends-plugin.json: {key}"))
+                    .with_path(&extends_path)
+                    .with_field(key.clone()),
             );
         }
     }
@@ -129,10 +125,14 @@ pub fn validate_extends_plugin(plugin_path: &Path) -> ValidationResult {
 fn extract_version(value: &serde_json::Value) -> Option<String> {
     if let Some(s) = value.as_str() {
         Some(s.to_string())
-    } else { value.as_object().map(|obj| obj.get("version")
+    } else {
+        value.as_object().map(|obj| {
+            obj.get("version")
                 .and_then(|v| v.as_str())
                 .unwrap_or("*")
-                .to_string()) }
+                .to_string()
+        })
+    }
 }
 
 fn value_type_name(v: &serde_json::Value) -> &'static str {
@@ -221,10 +221,7 @@ mod tests {
     #[test]
     fn object_value_without_version_defaults_to_star() {
         let tmp = TempDir::new().unwrap();
-        let plugin = write_extends(
-            &tmp,
-            r#"{"dependencies": {"foo": {"notes": "optional"}}}"#,
-        );
+        let plugin = write_extends(&tmp, r#"{"dependencies": {"foo": {"notes": "optional"}}}"#);
         let result = validate_extends_plugin(&plugin);
         assert!(!result.has_errors());
     }

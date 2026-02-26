@@ -40,6 +40,11 @@ impl Reporter {
         }
     }
 
+    /// Returns the current output mode.
+    pub fn mode(&self) -> OutputMode {
+        self.mode
+    }
+
     pub fn error(&mut self, message: &str) {
         match self.mode {
             OutputMode::Human => {

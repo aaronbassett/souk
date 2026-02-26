@@ -33,10 +33,7 @@ pub fn run_update(
                 for name in &updated {
                     reporter.success(&format!("Updated: {name}"));
                 }
-                reporter.success(&format!(
-                    "Successfully updated {} plugin(s)",
-                    updated.len()
-                ));
+                reporter.success(&format!("Successfully updated {} plugin(s)", updated.len()));
             }
             true
         }
