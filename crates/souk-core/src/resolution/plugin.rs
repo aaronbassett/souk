@@ -9,13 +9,13 @@ pub fn resolve_plugin(
 ) -> Result<PathBuf, SoukError> {
     let direct = PathBuf::from(input);
     if direct.is_dir() {
-        return direct.canonicalize().map_err(|e| SoukError::Io(e));
+        return direct.canonicalize().map_err(SoukError::Io);
     }
 
     if let Some(config) = config {
         let relative = config.plugin_root_abs.join(input);
         if relative.is_dir() {
-            return relative.canonicalize().map_err(|e| SoukError::Io(e));
+            return relative.canonicalize().map_err(SoukError::Io);
         }
 
         if let Some(entry) = config
@@ -26,7 +26,7 @@ pub fn resolve_plugin(
         {
             let resolved = resolve_source(&entry.source, config)?;
             if resolved.is_dir() {
-                return resolved.canonicalize().map_err(|e| SoukError::Io(e));
+                return resolved.canonicalize().map_err(SoukError::Io);
             }
         }
     }

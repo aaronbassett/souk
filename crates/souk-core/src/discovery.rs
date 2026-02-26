@@ -14,7 +14,7 @@ pub struct MarketplaceConfig {
 pub fn discover_marketplace(start_dir: &Path) -> Result<PathBuf, SoukError> {
     let mut current = start_dir
         .canonicalize()
-        .map_err(|e| SoukError::Io(e))?;
+        .map_err(SoukError::Io)?;
 
     loop {
         let candidate = current.join(".claude-plugin").join("marketplace.json");
@@ -40,7 +40,7 @@ pub fn discover_marketplace(start_dir: &Path) -> Result<PathBuf, SoukError> {
 pub fn load_marketplace_config(marketplace_path: &Path) -> Result<MarketplaceConfig, SoukError> {
     let marketplace_path = marketplace_path
         .canonicalize()
-        .map_err(|e| SoukError::Io(e))?;
+        .map_err(SoukError::Io)?;
 
     let content = std::fs::read_to_string(&marketplace_path)?;
     let marketplace: Marketplace = serde_json::from_str(&content)?;

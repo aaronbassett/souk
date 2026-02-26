@@ -129,16 +129,10 @@ pub fn validate_extends_plugin(plugin_path: &Path) -> ValidationResult {
 fn extract_version(value: &serde_json::Value) -> Option<String> {
     if let Some(s) = value.as_str() {
         Some(s.to_string())
-    } else if let Some(obj) = value.as_object() {
-        Some(
-            obj.get("version")
+    } else { value.as_object().map(|obj| obj.get("version")
                 .and_then(|v| v.as_str())
                 .unwrap_or("*")
-                .to_string(),
-        )
-    } else {
-        None
-    }
+                .to_string()) }
 }
 
 fn value_type_name(v: &serde_json::Value) -> &'static str {

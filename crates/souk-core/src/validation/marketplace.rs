@@ -123,7 +123,7 @@ fn check_completeness(config: &MarketplaceConfig) -> ValidationResult {
                 ValidationDiagnostic::warning(format!(
                     "Plugin in filesystem but not in marketplace: {fs_name}"
                 ))
-                .with_path(&config.plugin_root_abs.join(fs_name)),
+                .with_path(config.plugin_root_abs.join(fs_name)),
             );
         }
     }
