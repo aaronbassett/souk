@@ -561,6 +561,7 @@ dependencies = [
  "colored",
  "insta",
  "predicates",
+ "serde",
  "serde_json",
  "souk-core",
  "tempfile",

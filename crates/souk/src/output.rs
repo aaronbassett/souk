@@ -1,7 +1,6 @@
 use colored::*;
 use serde::Serialize;
-use souk_core::error::{Severity, ValidationDiagnostic, ValidationResult};
-use std::io::Write;
+use souk_core::error::{Severity, ValidationResult};
 
 /// Output mode for the CLI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

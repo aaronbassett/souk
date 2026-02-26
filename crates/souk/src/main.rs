@@ -1,3 +1,53 @@
+mod cli;
+mod commands;
+mod output;
+
+use clap::Parser;
+use cli::{Cli, ColorMode, Commands, ValidateTarget};
+use output::{OutputMode, Reporter};
+
 fn main() {
-    println!("souk v0.1.0");
+    let cli = Cli::parse();
+
+    let mode = if cli.json {
+        OutputMode::Json
+    } else if cli.quiet {
+        OutputMode::Quiet
+    } else {
+        OutputMode::Human
+    };
+
+    match cli.color {
+        ColorMode::Never => colored::control::set_override(false),
+        ColorMode::Always => colored::control::set_override(true),
+        ColorMode::Auto => {}
+    }
+
+    let mut reporter = Reporter::new(mode);
+    let marketplace = cli.marketplace.as_deref();
+
+    let success = match cli.command {
+        Commands::Validate { target } => match target {
+            ValidateTarget::Plugin { plugins } => {
+                commands::validate::run_validate_plugin(&plugins, marketplace, &mut reporter)
+            }
+            ValidateTarget::Marketplace { skip_plugins } => {
+                commands::validate::run_validate_marketplace(
+                    skip_plugins,
+                    marketplace,
+                    &mut reporter,
+                )
+            }
+        },
+        _ => {
+            reporter.error("Command not yet implemented");
+            false
+        }
+    };
+
+    reporter.finish();
+
+    if !success {
+        std::process::exit(1);
+    }
 }
