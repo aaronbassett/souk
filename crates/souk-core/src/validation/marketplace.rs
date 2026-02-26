@@ -132,7 +132,8 @@ fn check_completeness(config: &MarketplaceConfig) -> ValidationResult {
         if !fs_plugins.contains(mp_source) {
             result.push(
                 ValidationDiagnostic::error(format!(
-                    "Plugin in marketplace but not in filesystem: {mp_source}"
+                    "Plugin in marketplace but not in filesystem: {mp_source}. \
+                     Run `souk remove {mp_source}` to clean up the stale entry."
                 ))
                 .with_path(&config.marketplace_path),
             );
@@ -264,6 +265,28 @@ mod tests {
             .diagnostics
             .iter()
             .any(|d| d.message.contains("Invalid JSON in plugin")));
+    }
+
+    #[test]
+    fn marketplace_not_in_filesystem_includes_remediation_hint() {
+        let tmp = TempDir::new().unwrap();
+        let config = setup_marketplace(
+            &tmp,
+            r#"{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{"name":"ghost","source":"ghost"}]}"#,
+            &[],
+        );
+        let result = validate_marketplace(&config, true);
+        assert!(result.has_errors());
+        let err = result
+            .diagnostics
+            .iter()
+            .find(|d| d.is_error() && d.message.contains("ghost"))
+            .expect("Should have error for missing plugin");
+        assert!(
+            err.message.contains("souk remove"),
+            "Error should include remediation hint: {}",
+            err.message
+        );
     }
 
     #[test]
