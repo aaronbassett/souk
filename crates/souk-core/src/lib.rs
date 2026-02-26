@@ -1,6 +1,7 @@
 pub mod error;
 pub mod types;
 pub mod discovery;
+pub mod ops;
 pub mod resolution;
 pub mod validation;
 
