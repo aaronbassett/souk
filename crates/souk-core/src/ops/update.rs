@@ -48,24 +48,39 @@ pub fn update_plugins(
         }
     }
 
-    // If a version bump is requested, first update plugin.json files on disk
-    if let Some(bump) = bump_type {
-        for name in names {
-            let entry = config
-                .marketplace
-                .plugins
-                .iter()
-                .find(|p| p.name == *name)
-                .unwrap();
+    // Resolve all plugin paths first (fail fast)
+    let mut plugin_paths: Vec<(String, std::path::PathBuf)> = Vec::new();
+    for name in names {
+        let entry = config
+            .marketplace
+            .plugins
+            .iter()
+            .find(|p| p.name == *name)
+            .unwrap();
+        let plugin_path = resolve_source(&entry.source, config)?;
+        plugin_paths.push((name.clone(), plugin_path));
+    }
 
-            let plugin_path = resolve_source(&entry.source, config)?;
+    // Create ALL guards BEFORE any writes
+    let mp_guard = AtomicGuard::new(&config.marketplace_path)?;
+
+    let mut plugin_guards: Vec<AtomicGuard> = Vec::new();
+    if bump_type.is_some() {
+        for (_name, plugin_path) in &plugin_paths {
             let plugin_json_path = plugin_path.join(".claude-plugin").join("plugin.json");
+            let guard = AtomicGuard::new(&plugin_json_path)?;
+            plugin_guards.push(guard);
+        }
+    }
 
+    // Now perform version bumps (protected by guards)
+    if let Some(bump) = bump_type {
+        for (name, plugin_path) in &plugin_paths {
+            let plugin_json_path = plugin_path.join(".claude-plugin").join("plugin.json");
             let content = fs::read_to_string(&plugin_json_path).map_err(|e| {
                 SoukError::Other(format!("Cannot read plugin.json for {name}: {e}"))
             })?;
 
-            // Parse as generic JSON to preserve all fields
             let mut doc: serde_json::Value = serde_json::from_str(&content)?;
 
             if let Some(version) = doc.get("version").and_then(|v| v.as_str()) {
@@ -85,46 +100,45 @@ pub fn update_plugins(
         }
     }
 
-    // Atomic update on marketplace.json
-    let guard = AtomicGuard::new(&config.marketplace_path)?;
-
+    // Update marketplace entries
     let content = fs::read_to_string(&config.marketplace_path)?;
     let mut marketplace: Marketplace = serde_json::from_str(&content)?;
 
     let mut updated = Vec::new();
 
-    for name in names {
-        let entry = marketplace
-            .plugins
-            .iter()
-            .find(|p| p.name == *name)
-            .unwrap();
-        let source = entry.source.clone();
-
-        // Re-read plugin.json to refresh metadata
-        let plugin_path = resolve_source(&source, config)?;
+    for (name, plugin_path) in &plugin_paths {
         let plugin_json_path = plugin_path.join(".claude-plugin").join("plugin.json");
-
         let pj_content = fs::read_to_string(&plugin_json_path)
             .map_err(|e| SoukError::Other(format!("Cannot read plugin.json for {name}: {e}")))?;
 
         let manifest: PluginManifest = serde_json::from_str(&pj_content)?;
 
-        // Update marketplace entry
+        // Check for rename collisions
+        if let Some(new_name) = manifest.name_str() {
+            if new_name != name.as_str() {
+                let collides = marketplace
+                    .plugins
+                    .iter()
+                    .any(|p| p.name == new_name && !names.contains(&p.name));
+                if collides {
+                    return Err(SoukError::Other(format!(
+                        "Plugin '{name}' would be renamed to '{new_name}' which conflicts with an existing plugin"
+                    )));
+                }
+            }
+        }
+
         if let Some(entry) = marketplace.plugins.iter_mut().find(|p| p.name == *name) {
             entry.tags = manifest.keywords.clone();
-            // If plugin.json has a different name, update it
             if let Some(new_name) = manifest.name_str() {
-                if new_name != name {
+                if new_name != name.as_str() {
                     entry.name = new_name.to_string();
                 }
             }
         }
 
-        // Re-validate the plugin
-        let validation = validate_plugin(&plugin_path);
+        let validation = validate_plugin(plugin_path);
         if validation.has_errors() {
-            drop(guard);
             return Err(SoukError::AtomicRollback(format!(
                 "Plugin validation failed for {name} after update"
             )));
@@ -144,13 +158,16 @@ pub fn update_plugins(
     let updated_config = load_marketplace_config(&config.marketplace_path)?;
     let validation = validate_marketplace(&updated_config, true);
     if validation.has_errors() {
-        drop(guard);
         return Err(SoukError::AtomicRollback(
             "Marketplace validation failed after update".to_string(),
         ));
     }
 
-    guard.commit()?;
+    // Success — commit all guards
+    mp_guard.commit()?;
+    for g in plugin_guards {
+        g.commit()?;
+    }
 
     Ok(updated)
 }
@@ -304,5 +321,74 @@ mod tests {
             let manifest: PluginManifest = serde_json::from_str(&content).unwrap();
             assert_eq!(manifest.version_str(), Some("1.0.1"));
         }
+    }
+
+    #[test]
+    fn update_bump_rolls_back_plugin_json_on_validation_failure() {
+        let tmp = TempDir::new().unwrap();
+        let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
+
+        // Record original plugin.json content
+        let plugin_json_path = config
+            .plugin_root_abs
+            .join("alpha")
+            .join(".claude-plugin")
+            .join("plugin.json");
+
+        // Create a marketplace with duplicate names (alpha appears twice) which will fail validation
+        let claude_dir = tmp.path().join(".claude-plugin");
+        let mp_json = r#"{"version":"0.1.0","pluginRoot":"./plugins","plugins":[
+            {"name":"alpha","source":"alpha","tags":["old"]},
+            {"name":"alpha","source":"alpha","tags":["dup"]}
+        ]}"#;
+        fs::write(claude_dir.join("marketplace.json"), mp_json).unwrap();
+        let bad_config = load_marketplace_config(&claude_dir.join("marketplace.json")).unwrap();
+
+        // This should fail because the marketplace has duplicate names
+        let result = update_plugins(&["alpha".to_string()], Some("patch"), &bad_config);
+        assert!(result.is_err());
+
+        // plugin.json should be restored to original version
+        let restored = fs::read_to_string(&plugin_json_path).unwrap();
+        let manifest: PluginManifest = serde_json::from_str(&restored).unwrap();
+        assert_eq!(
+            manifest.version_str(),
+            Some("1.0.0"),
+            "plugin.json should be rolled back to original version"
+        );
+    }
+
+    #[test]
+    fn update_detects_rename_collision() {
+        let tmp = TempDir::new().unwrap();
+        let config = setup_marketplace_with_plugins(&tmp, &["alpha", "beta"]);
+
+        // Modify alpha's plugin.json to have name "beta" (which already exists)
+        let alpha_pj = config
+            .plugin_root_abs
+            .join("alpha")
+            .join(".claude-plugin")
+            .join("plugin.json");
+        fs::write(
+            &alpha_pj,
+            r#"{"name":"beta","version":"1.0.0","description":"test plugin","keywords":["original"]}"#,
+        )
+        .unwrap();
+
+        // Update alpha — should detect the rename collision with beta
+        let result = update_plugins(&["alpha".to_string()], None, &config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("conflicts"),
+            "Should report rename collision: {err}"
+        );
+
+        // marketplace.json should be unchanged (rolled back)
+        let content = fs::read_to_string(&config.marketplace_path).unwrap();
+        let mp: Marketplace = serde_json::from_str(&content).unwrap();
+        assert_eq!(mp.plugins.len(), 2);
+        assert!(mp.plugins.iter().any(|p| p.name == "alpha"));
+        assert!(mp.plugins.iter().any(|p| p.name == "beta"));
     }
 }
