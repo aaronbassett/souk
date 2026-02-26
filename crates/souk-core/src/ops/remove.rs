@@ -31,6 +31,7 @@ use crate::version::bump_patch;
 pub fn remove_plugins(
     names: &[String],
     delete_files: bool,
+    allow_external_delete: bool,
     config: &MarketplaceConfig,
 ) -> Result<Vec<String>, SoukError> {
     if names.is_empty() {
@@ -44,29 +45,48 @@ pub fn remove_plugins(
         }
     }
 
-    // Atomic update
+    // Pre-compute delete targets and validate paths before any mutation
+    let mut delete_targets: Vec<(String, std::path::PathBuf)> = Vec::new();
+    if delete_files {
+        let plugin_root = config.plugin_root_abs.canonicalize().map_err(SoukError::Io)?;
+
+        for name in names {
+            let entry = config
+                .marketplace
+                .plugins
+                .iter()
+                .find(|p| p.name == *name)
+                .unwrap();
+
+            if let Ok(plugin_path) = resolve_source(&entry.source, config) {
+                if plugin_path.is_dir() {
+                    let resolved = plugin_path.canonicalize().map_err(SoukError::Io)?;
+                    let is_internal = resolved.starts_with(&plugin_root);
+
+                    if !is_internal && !allow_external_delete {
+                        return Err(SoukError::Other(format!(
+                            "Refusing to delete '{}': path is outside pluginRoot ({}). \
+                             Use --allow-external-delete to override.",
+                            resolved.display(),
+                            plugin_root.display()
+                        )));
+                    }
+
+                    delete_targets.push((name.clone(), resolved));
+                }
+            }
+        }
+    }
+
+    // Atomic update — marketplace.json changes first
     let guard = AtomicGuard::new(&config.marketplace_path)?;
 
     let content = fs::read_to_string(&config.marketplace_path)?;
     let mut marketplace: Marketplace = serde_json::from_str(&content)?;
 
     let mut removed = Vec::new();
-
     for name in names {
-        // Find the entry to get the source path before removing
-        let entry = marketplace.plugins.iter().find(|p| p.name == *name);
-
-        if let Some(entry) = entry {
-            if delete_files {
-                // Resolve the source to a filesystem path
-                if let Ok(plugin_path) = resolve_source(&entry.source, config) {
-                    if plugin_path.is_dir() {
-                        fs::remove_dir_all(&plugin_path)?;
-                    }
-                }
-            }
-
-            // Remove from plugins list
+        if marketplace.plugins.iter().any(|p| p.name == *name) {
             marketplace.plugins.retain(|p| p.name != *name);
             removed.push(name.clone());
         }
@@ -79,7 +99,7 @@ pub fn remove_plugins(
     let json = serde_json::to_string_pretty(&marketplace)?;
     fs::write(&config.marketplace_path, format!("{json}\n"))?;
 
-    // Validate (skip plugin-level validation since we just removed plugins)
+    // Validate
     let updated_config = load_marketplace_config(&config.marketplace_path)?;
     let validation = validate_marketplace(&updated_config, true);
     if validation.has_errors() {
@@ -91,14 +111,43 @@ pub fn remove_plugins(
 
     guard.commit()?;
 
+    // Delete directories AFTER successful marketplace update
+    for (name, path) in &delete_targets {
+        if path.is_dir() {
+            if let Err(e) = fs::remove_dir_all(path) {
+                eprintln!(
+                    "Warning: removed '{name}' from marketplace but failed to delete directory {}: {e}",
+                    path.display()
+                );
+            }
+        }
+    }
+
     Ok(removed)
 }
 
 /// Deletes a plugin directory from disk. Exposed for testing or direct use.
-pub fn delete_plugin_dir(source: &str, config: &MarketplaceConfig) -> Result<(), SoukError> {
+pub fn delete_plugin_dir(
+    source: &str,
+    allow_external_delete: bool,
+    config: &MarketplaceConfig,
+) -> Result<(), SoukError> {
     let plugin_path = resolve_source(source, config)?;
     if plugin_path.is_dir() {
-        fs::remove_dir_all(&plugin_path)?;
+        let resolved = plugin_path.canonicalize().map_err(SoukError::Io)?;
+        let plugin_root = config.plugin_root_abs.canonicalize().map_err(SoukError::Io)?;
+        let is_internal = resolved.starts_with(&plugin_root);
+
+        if !is_internal && !allow_external_delete {
+            return Err(SoukError::Other(format!(
+                "Refusing to delete '{}': path is outside pluginRoot ({}). \
+                 Use --allow-external-delete to override.",
+                resolved.display(),
+                plugin_root.display()
+            )));
+        }
+
+        fs::remove_dir_all(&resolved)?;
     }
     Ok(())
 }
@@ -142,7 +191,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha", "beta"]);
 
-        let removed = remove_plugins(&["alpha".to_string()], false, &config).unwrap();
+        let removed = remove_plugins(&["alpha".to_string()], false, false, &config).unwrap();
 
         assert_eq!(removed, vec!["alpha"]);
 
@@ -161,7 +210,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
 
-        let result = remove_plugins(&["nonexistent".to_string()], false, &config);
+        let result = remove_plugins(&["nonexistent".to_string()], false, false, &config);
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -180,6 +229,7 @@ mod tests {
         let removed = remove_plugins(
             &["alpha".to_string()],
             true, // delete files
+            false,
             &config,
         )
         .unwrap();
@@ -200,6 +250,7 @@ mod tests {
         let removed = remove_plugins(
             &["alpha".to_string()],
             false, // don't delete files
+            false,
             &config,
         )
         .unwrap();
@@ -216,7 +267,7 @@ mod tests {
         let config = setup_marketplace_with_plugins(&tmp, &["alpha", "beta", "gamma"]);
 
         let removed =
-            remove_plugins(&["alpha".to_string(), "gamma".to_string()], false, &config).unwrap();
+            remove_plugins(&["alpha".to_string(), "gamma".to_string()], false, false, &config).unwrap();
 
         assert_eq!(removed.len(), 2);
 
@@ -231,11 +282,93 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
 
-        let removed = remove_plugins(&[], false, &config).unwrap();
+        let removed = remove_plugins(&[], false, false, &config).unwrap();
         assert!(removed.is_empty());
 
         let content = fs::read_to_string(&config.marketplace_path).unwrap();
         let mp: Marketplace = serde_json::from_str(&content).unwrap();
         assert_eq!(mp.plugins.len(), 1);
+    }
+
+    #[test]
+    fn remove_external_plugin_delete_refused_without_flag() {
+        let tmp = TempDir::new().unwrap();
+
+        // Create an external plugin directory
+        let external_dir = TempDir::new().unwrap();
+        let ext_plugin = external_dir.path().join("ext");
+        let ext_claude = ext_plugin.join(".claude-plugin");
+        fs::create_dir_all(&ext_claude).unwrap();
+        fs::write(
+            ext_claude.join("plugin.json"),
+            r#"{"name":"ext","version":"1.0.0","description":"test"}"#,
+        )
+        .unwrap();
+
+        // Set up marketplace with external source (absolute path)
+        let claude_dir = tmp.path().join(".claude-plugin");
+        fs::create_dir_all(&claude_dir).unwrap();
+        let plugins_dir = tmp.path().join("plugins");
+        fs::create_dir_all(&plugins_dir).unwrap();
+
+        let ext_path_str = ext_plugin.to_string_lossy();
+        let mp_json = format!(
+            r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{{"name":"ext","source":"{ext_path_str}"}}]}}"#
+        );
+        fs::write(claude_dir.join("marketplace.json"), &mp_json).unwrap();
+        let config = load_marketplace_config(&claude_dir.join("marketplace.json")).unwrap();
+
+        // Try to delete without allow flag — should fail
+        let result = remove_plugins(&["ext".to_string()], true, false, &config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("outside pluginRoot"), "Error: {err}");
+
+        // External directory should still exist
+        assert!(ext_plugin.exists());
+    }
+
+    #[test]
+    fn remove_external_plugin_delete_allowed_with_flag() {
+        let tmp = TempDir::new().unwrap();
+
+        let external_dir = TempDir::new().unwrap();
+        let ext_plugin = external_dir.path().join("ext");
+        let ext_claude = ext_plugin.join(".claude-plugin");
+        fs::create_dir_all(&ext_claude).unwrap();
+        fs::write(
+            ext_claude.join("plugin.json"),
+            r#"{"name":"ext","version":"1.0.0","description":"test"}"#,
+        )
+        .unwrap();
+
+        let claude_dir = tmp.path().join(".claude-plugin");
+        fs::create_dir_all(&claude_dir).unwrap();
+        let plugins_dir = tmp.path().join("plugins");
+        fs::create_dir_all(&plugins_dir).unwrap();
+
+        let ext_path_str = ext_plugin.to_string_lossy();
+        let mp_json = format!(
+            r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{{"name":"ext","source":"{ext_path_str}"}}]}}"#
+        );
+        fs::write(claude_dir.join("marketplace.json"), &mp_json).unwrap();
+        let config = load_marketplace_config(&claude_dir.join("marketplace.json")).unwrap();
+
+        // Delete with allow flag — should succeed
+        let removed = remove_plugins(&["ext".to_string()], true, true, &config).unwrap();
+        assert_eq!(removed, vec!["ext"]);
+        assert!(!ext_plugin.exists());
+    }
+
+    #[test]
+    fn remove_internal_plugin_delete_works_without_flag() {
+        let tmp = TempDir::new().unwrap();
+        let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
+
+        assert!(config.plugin_root_abs.join("alpha").exists());
+
+        let removed = remove_plugins(&["alpha".to_string()], true, false, &config).unwrap();
+        assert_eq!(removed, vec!["alpha"]);
+        assert!(!config.plugin_root_abs.join("alpha").exists());
     }
 }

@@ -64,6 +64,10 @@ pub enum Commands {
         /// Also delete plugin directory from disk
         #[arg(long)]
         delete: bool,
+
+        /// Allow deleting plugin directories outside pluginRoot
+        #[arg(long, requires = "delete")]
+        allow_external_delete: bool,
     },
 
     /// Update plugin metadata and bump version

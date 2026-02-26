@@ -10,6 +10,7 @@ use souk_core::ops::remove::remove_plugins;
 pub fn run_remove(
     plugins: &[String],
     delete: bool,
+    allow_external_delete: bool,
     config: &MarketplaceConfig,
     reporter: &mut Reporter,
 ) -> bool {
@@ -20,7 +21,7 @@ pub fn run_remove(
 
     reporter.section("Removing Plugins");
 
-    match remove_plugins(plugins, delete, config) {
+    match remove_plugins(plugins, delete, allow_external_delete, config) {
         Ok(removed) => {
             if removed.is_empty() {
                 reporter.info("No plugins removed");
