@@ -31,7 +31,7 @@ use crate::SoukError;
 /// An RAII guard that backs up a file before mutation and restores it on drop
 /// unless explicitly committed.
 ///
-/// The backup file is named `{original}.bak.{epoch_secs}` and lives alongside
+/// The backup file is named `{original}.bak.{epoch_nanos}.{pid}` and lives alongside
 /// the original. This mirrors the pattern used by the shell-based atomic helpers
 /// in `temp-reference-scripts/lib/atomic.sh`.
 ///
@@ -67,18 +67,20 @@ impl AtomicGuard {
         let original_path = path.to_path_buf();
 
         let backup_path = if original_path.exists() {
-            let epoch = SystemTime::now()
+            let nanos = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .expect("system clock is before UNIX epoch")
-                .as_secs();
+                .as_nanos();
+            let pid = std::process::id();
 
             let backup = original_path.with_extension(format!(
-                "{}.bak.{}",
+                "{}.bak.{}.{}",
                 original_path
                     .extension()
                     .and_then(|e| e.to_str())
                     .unwrap_or(""),
-                epoch
+                nanos,
+                pid
             ));
 
             fs::copy(&original_path, &backup)?;
@@ -134,11 +136,22 @@ impl Drop for AtomicGuard {
 
         if let Some(ref backup) = self.backup_path {
             if backup.exists() {
-                // Best-effort restore. If this fails there is not much we can do
-                // from a destructor -- the backup file remains on disk for manual
-                // recovery.
-                let _ = fs::copy(backup, &self.original_path);
-                let _ = fs::remove_file(backup);
+                if let Err(e) = fs::copy(backup, &self.original_path) {
+                    eprintln!(
+                        "Warning: failed to restore {} from backup {}: {}",
+                        self.original_path.display(),
+                        backup.display(),
+                        e
+                    );
+                    return; // Don't remove backup if restore failed
+                }
+                if let Err(e) = fs::remove_file(backup) {
+                    eprintln!(
+                        "Warning: failed to remove backup file {}: {}",
+                        backup.display(),
+                        e
+                    );
+                }
             }
         }
     }
@@ -320,13 +333,42 @@ mod tests {
         let guard = AtomicGuard::new(&file_path).unwrap();
         let backup = guard.backup_path().unwrap();
 
-        // The backup path should contain "json.bak."
         let backup_name = backup.file_name().unwrap().to_str().unwrap();
         assert!(
             backup_name.contains("json.bak."),
             "backup name '{backup_name}' should contain 'json.bak.'"
         );
+        // Also verify PID is appended
+        let pid = std::process::id().to_string();
+        assert!(
+            backup_name.ends_with(&pid),
+            "backup name '{backup_name}' should end with PID '{pid}'"
+        );
 
         guard.commit().unwrap();
+    }
+
+    #[test]
+    fn rapid_guards_produce_unique_backups() {
+        let dir = TempDir::new().expect("failed to create temp dir");
+        let file_path = dir.path().join("marketplace.json");
+        fs::write(&file_path, "original").unwrap();
+
+        let guard1 = AtomicGuard::new(&file_path).unwrap();
+        let guard2 = AtomicGuard::new(&file_path).unwrap();
+
+        let bp1 = guard1.backup_path().unwrap().to_path_buf();
+        let bp2 = guard2.backup_path().unwrap().to_path_buf();
+
+        assert_ne!(bp1, bp2, "two guards created rapidly should have different backup paths");
+
+        // Both backups should exist and contain the original content
+        assert!(bp1.exists());
+        assert!(bp2.exists());
+        assert_eq!(fs::read_to_string(&bp1).unwrap(), "original");
+        assert_eq!(fs::read_to_string(&bp2).unwrap(), "original");
+
+        guard1.commit().unwrap();
+        guard2.commit().unwrap();
     }
 }
