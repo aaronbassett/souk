@@ -39,6 +39,10 @@ fn main() {
                 )
             }
         },
+        Commands::Init { path, plugin_root } => {
+            let target = path.as_deref().unwrap_or(".");
+            commands::init::run_init(target, &plugin_root, &mut reporter)
+        }
         _ => {
             reporter.error("Command not yet implemented");
             false

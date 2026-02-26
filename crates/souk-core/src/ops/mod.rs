@@ -6,5 +6,6 @@
 //! restores the original file from its backup.
 
 pub mod atomic;
+pub mod init;
 
 pub use atomic::AtomicGuard;
