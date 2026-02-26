@@ -319,12 +319,24 @@ fn read_plugin_manifest(plugin_path: &Path) -> Result<PluginManifest, SoukError>
 }
 
 /// Recursively copies a directory from `src` to `dst`.
+///
+/// Returns an error if any symlinks are encountered.
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), SoukError> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
         let entry = entry?;
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
+
+        // Check for symlinks before processing
+        let meta = fs::symlink_metadata(&src_path)?;
+        if meta.file_type().is_symlink() {
+            return Err(SoukError::Other(format!(
+                "Symlink detected at '{}': symlinks are not supported in plugin directories",
+                src_path.display()
+            )));
+        }
+
         if src_path.is_dir() {
             copy_dir_recursive(&src_path, &dst_path)?;
         } else {
@@ -560,6 +572,33 @@ mod tests {
         assert!(plan.actions[0].is_external);
         // Source should be absolute path since no_copy is true
         assert!(plan.actions[0].source.starts_with('/'));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn copy_dir_recursive_rejects_symlinks() {
+        let tmp = TempDir::new().unwrap();
+        let src = tmp.path().join("src_plugin");
+        let claude_dir = src.join(".claude-plugin");
+        fs::create_dir_all(&claude_dir).unwrap();
+        fs::write(
+            claude_dir.join("plugin.json"),
+            r#"{"name":"sym","version":"1.0.0","description":"test"}"#,
+        )
+        .unwrap();
+
+        // Create a symlink inside the plugin directory
+        std::os::unix::fs::symlink("/tmp", src.join("bad-link")).unwrap();
+
+        let dst = tmp.path().join("dst_plugin");
+        let result = copy_dir_recursive(&src, &dst);
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("Symlink"),
+            "Error should mention symlink: {err_msg}"
+        );
     }
 
     #[test]
