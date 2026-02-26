@@ -2,9 +2,12 @@ mod cli;
 mod commands;
 mod output;
 
+use std::path::PathBuf;
+
 use clap::Parser;
 use cli::{Cli, ColorMode, Commands, ValidateTarget};
 use output::{OutputMode, Reporter};
+use souk_core::discovery::{discover_marketplace, load_marketplace_config, MarketplaceConfig};
 
 fn main() {
     let cli = Cli::parse();
@@ -43,6 +46,52 @@ fn main() {
             let target = path.as_deref().unwrap_or(".");
             commands::init::run_init(target, &plugin_root, &mut reporter)
         }
+        Commands::Add {
+            plugins,
+            on_conflict,
+            dry_run,
+            no_copy,
+        } => match load_config_required(marketplace, &mut reporter) {
+            Some(config) => commands::add::run_add(
+                &plugins,
+                &on_conflict,
+                dry_run,
+                no_copy,
+                &config,
+                &mut reporter,
+            ),
+            None => false,
+        },
+        Commands::Remove { plugins, delete } => {
+            match load_config_required(marketplace, &mut reporter) {
+                Some(config) => {
+                    commands::remove::run_remove(&plugins, delete, &config, &mut reporter)
+                }
+                None => false,
+            }
+        }
+        Commands::Update {
+            plugins,
+            major,
+            minor,
+            patch,
+        } => {
+            let bump_type = if major {
+                Some("major")
+            } else if minor {
+                Some("minor")
+            } else if patch {
+                Some("patch")
+            } else {
+                None
+            };
+            match load_config_required(marketplace, &mut reporter) {
+                Some(config) => {
+                    commands::update::run_update(&plugins, bump_type, &config, &mut reporter)
+                }
+                None => false,
+            }
+        }
         _ => {
             reporter.error("Command not yet implemented");
             false
@@ -53,5 +102,38 @@ fn main() {
 
     if !success {
         std::process::exit(1);
+    }
+}
+
+/// Loads the marketplace configuration, reporting an error if it cannot be found.
+fn load_config_required(
+    marketplace_override: Option<&str>,
+    reporter: &mut Reporter,
+) -> Option<MarketplaceConfig> {
+    let mp_path = if let Some(path) = marketplace_override {
+        PathBuf::from(path)
+    } else {
+        let cwd = match std::env::current_dir() {
+            Ok(c) => c,
+            Err(e) => {
+                reporter.error(&format!("Cannot get current directory: {e}"));
+                return None;
+            }
+        };
+        match discover_marketplace(&cwd) {
+            Ok(p) => p,
+            Err(e) => {
+                reporter.error(&format!("{e}"));
+                return None;
+            }
+        }
+    };
+
+    match load_marketplace_config(&mp_path) {
+        Ok(c) => Some(c),
+        Err(e) => {
+            reporter.error(&format!("Failed to load marketplace: {e}"));
+            None
+        }
     }
 }

@@ -5,7 +5,10 @@
 //! fails partway through, the guard's `Drop` implementation automatically
 //! restores the original file from its backup.
 
+pub mod add;
 pub mod atomic;
 pub mod init;
+pub mod remove;
+pub mod update;
 
 pub use atomic::AtomicGuard;
