@@ -5,7 +5,7 @@ mod output;
 use std::path::PathBuf;
 
 use clap::Parser;
-use cli::{Cli, ColorMode, Commands, ValidateTarget};
+use cli::{Cli, CiAction, ColorMode, Commands, ReviewTarget, ValidateTarget};
 use output::{OutputMode, Reporter};
 use souk_core::discovery::{discover_marketplace, load_marketplace_config, MarketplaceConfig};
 
@@ -92,6 +92,29 @@ fn main() {
                 None => false,
             }
         }
+        Commands::Review { target } => match target {
+            ReviewTarget::Plugin {
+                plugin,
+                output_dir,
+                provider,
+                model,
+            } => commands::review::run_review_plugin(
+                &plugin,
+                output_dir.as_deref(),
+                provider.as_deref(),
+                model.as_deref(),
+                marketplace,
+                &mut reporter,
+            ),
+            _ => {
+                reporter.error("Review subcommand not yet implemented");
+                false
+            }
+        },
+        Commands::Ci { action } => match action {
+            CiAction::Run { hook } => commands::ci::run_ci_hook(&hook, &mut reporter),
+            CiAction::Install { target } => commands::ci::run_ci_install(&target, &mut reporter),
+        },
         _ => {
             reporter.error("Command not yet implemented");
             false
