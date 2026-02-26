@@ -48,7 +48,10 @@ pub fn remove_plugins(
     // Pre-compute delete targets and validate paths before any mutation
     let mut delete_targets: Vec<(String, std::path::PathBuf)> = Vec::new();
     if delete_files {
-        let plugin_root = config.plugin_root_abs.canonicalize().map_err(SoukError::Io)?;
+        let plugin_root = config
+            .plugin_root_abs
+            .canonicalize()
+            .map_err(SoukError::Io)?;
 
         for name in names {
             let entry = config
@@ -135,7 +138,10 @@ pub fn delete_plugin_dir(
     let plugin_path = resolve_source(source, config)?;
     if plugin_path.is_dir() {
         let resolved = plugin_path.canonicalize().map_err(SoukError::Io)?;
-        let plugin_root = config.plugin_root_abs.canonicalize().map_err(SoukError::Io)?;
+        let plugin_root = config
+            .plugin_root_abs
+            .canonicalize()
+            .map_err(SoukError::Io)?;
         let is_internal = resolved.starts_with(&plugin_root);
 
         if !is_internal && !allow_external_delete {
@@ -266,8 +272,13 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha", "beta", "gamma"]);
 
-        let removed =
-            remove_plugins(&["alpha".to_string(), "gamma".to_string()], false, false, &config).unwrap();
+        let removed = remove_plugins(
+            &["alpha".to_string(), "gamma".to_string()],
+            false,
+            false,
+            &config,
+        )
+        .unwrap();
 
         assert_eq!(removed.len(), 2);
 

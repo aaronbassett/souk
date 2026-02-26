@@ -62,14 +62,20 @@ fn main() {
             ),
             None => false,
         },
-        Commands::Remove { plugins, delete, allow_external_delete } => {
-            match load_config_required(marketplace, &mut reporter) {
-                Some(config) => {
-                    commands::remove::run_remove(&plugins, delete, allow_external_delete, &config, &mut reporter)
-                }
-                None => false,
-            }
-        }
+        Commands::Remove {
+            plugins,
+            delete,
+            allow_external_delete,
+        } => match load_config_required(marketplace, &mut reporter) {
+            Some(config) => commands::remove::run_remove(
+                &plugins,
+                delete,
+                allow_external_delete,
+                &config,
+                &mut reporter,
+            ),
+            None => false,
+        },
         Commands::Update {
             plugins,
             major,
