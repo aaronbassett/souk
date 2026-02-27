@@ -13,6 +13,15 @@ use crate::types::Marketplace;
 use crate::validation::validate_marketplace;
 use crate::version::bump_patch;
 
+/// The result of a remove operation.
+#[derive(Debug)]
+pub struct RemoveResult {
+    /// Plugin names that were successfully removed from the marketplace.
+    pub removed: Vec<String>,
+    /// Non-fatal warnings (e.g., directory delete failures).
+    pub warnings: Vec<String>,
+}
+
 /// Removes the named plugins from the marketplace.
 ///
 /// For each name in `names`:
@@ -20,7 +29,9 @@ use crate::version::bump_patch;
 /// - If `delete_files` is true, also removes the plugin directory from disk
 /// - Bumps the marketplace version (patch)
 ///
-/// Returns the list of plugin names that were actually removed.
+/// Returns a [`RemoveResult`] with the removed names and any warnings
+/// (e.g., if a directory could not be deleted after the marketplace entry
+/// was removed).
 ///
 /// # Errors
 ///
@@ -33,9 +44,12 @@ pub fn remove_plugins(
     delete_files: bool,
     allow_external_delete: bool,
     config: &MarketplaceConfig,
-) -> Result<Vec<String>, SoukError> {
+) -> Result<RemoveResult, SoukError> {
     if names.is_empty() {
-        return Ok(Vec::new());
+        return Ok(RemoveResult {
+            removed: Vec::new(),
+            warnings: Vec::new(),
+        });
     }
 
     // Verify all names exist before making any changes
@@ -115,18 +129,19 @@ pub fn remove_plugins(
     guard.commit()?;
 
     // Delete directories AFTER successful marketplace update
+    let mut warnings = Vec::new();
     for (name, path) in &delete_targets {
         if path.is_dir() {
             if let Err(e) = fs::remove_dir_all(path) {
-                eprintln!(
-                    "Warning: removed '{name}' from marketplace but failed to delete directory {}: {e}",
+                warnings.push(format!(
+                    "Removed '{name}' from marketplace but failed to delete directory {}: {e}",
                     path.display()
-                );
+                ));
             }
         }
     }
 
-    Ok(removed)
+    Ok(RemoveResult { removed, warnings })
 }
 
 /// Deletes a plugin directory from disk. Exposed for testing or direct use.
@@ -197,9 +212,10 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha", "beta"]);
 
-        let removed = remove_plugins(&["alpha".to_string()], false, false, &config).unwrap();
+        let result = remove_plugins(&["alpha".to_string()], false, false, &config).unwrap();
 
-        assert_eq!(removed, vec!["alpha"]);
+        assert_eq!(result.removed, vec!["alpha"]);
+        assert!(result.warnings.is_empty());
 
         let content = fs::read_to_string(&config.marketplace_path).unwrap();
         let mp: Marketplace = serde_json::from_str(&content).unwrap();
@@ -232,7 +248,7 @@ mod tests {
 
         assert!(config.plugin_root_abs.join("alpha").exists());
 
-        let removed = remove_plugins(
+        let result = remove_plugins(
             &["alpha".to_string()],
             true, // delete files
             false,
@@ -240,7 +256,8 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(removed, vec!["alpha"]);
+        assert_eq!(result.removed, vec!["alpha"]);
+        assert!(result.warnings.is_empty());
 
         // Plugin directory should be gone
         assert!(!config.plugin_root_abs.join("alpha").exists());
@@ -253,7 +270,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
 
-        let removed = remove_plugins(
+        let result = remove_plugins(
             &["alpha".to_string()],
             false, // don't delete files
             false,
@@ -261,7 +278,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(removed, vec!["alpha"]);
+        assert_eq!(result.removed, vec!["alpha"]);
 
         // Plugin directory should still exist
         assert!(config.plugin_root_abs.join("alpha").exists());
@@ -272,7 +289,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha", "beta", "gamma"]);
 
-        let removed = remove_plugins(
+        let result = remove_plugins(
             &["alpha".to_string(), "gamma".to_string()],
             false,
             false,
@@ -280,7 +297,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(removed.len(), 2);
+        assert_eq!(result.removed.len(), 2);
 
         let content = fs::read_to_string(&config.marketplace_path).unwrap();
         let mp: Marketplace = serde_json::from_str(&content).unwrap();
@@ -293,8 +310,8 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace_with_plugins(&tmp, &["alpha"]);
 
-        let removed = remove_plugins(&[], false, false, &config).unwrap();
-        assert!(removed.is_empty());
+        let result = remove_plugins(&[], false, false, &config).unwrap();
+        assert!(result.removed.is_empty());
 
         let content = fs::read_to_string(&config.marketplace_path).unwrap();
         let mp: Marketplace = serde_json::from_str(&content).unwrap();
@@ -366,8 +383,8 @@ mod tests {
         let config = load_marketplace_config(&claude_dir.join("marketplace.json")).unwrap();
 
         // Delete with allow flag — should succeed
-        let removed = remove_plugins(&["ext".to_string()], true, true, &config).unwrap();
-        assert_eq!(removed, vec!["ext"]);
+        let result = remove_plugins(&["ext".to_string()], true, true, &config).unwrap();
+        assert_eq!(result.removed, vec!["ext"]);
         assert!(!ext_plugin.exists());
     }
 
@@ -378,8 +395,8 @@ mod tests {
 
         assert!(config.plugin_root_abs.join("alpha").exists());
 
-        let removed = remove_plugins(&["alpha".to_string()], true, false, &config).unwrap();
-        assert_eq!(removed, vec!["alpha"]);
+        let result = remove_plugins(&["alpha".to_string()], true, false, &config).unwrap();
+        assert_eq!(result.removed, vec!["alpha"]);
         assert!(!config.plugin_root_abs.join("alpha").exists());
     }
 }

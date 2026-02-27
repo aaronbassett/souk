@@ -286,8 +286,14 @@ pub fn execute_add(
                 fs::remove_dir_all(&target_dir)?;
             }
 
-            copy_dir_recursive(&action.plugin_path, &target_dir)?;
-            copied_dirs.push(target_dir);
+            copied_dirs.push(target_dir.clone());
+            if let Err(e) = copy_dir_recursive(&action.plugin_path, &target_dir) {
+                // Clean up all previously copied dirs plus the partial one
+                for dir in &copied_dirs {
+                    let _ = fs::remove_dir_all(dir);
+                }
+                return Err(e);
+            }
         }
     }
 

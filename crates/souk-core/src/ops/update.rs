@@ -3,6 +3,7 @@
 //! Re-reads plugin.json from disk to refresh the marketplace entry, and
 //! optionally bumps the plugin version.
 
+use std::collections::HashMap;
 use std::fs;
 
 use crate::discovery::{load_marketplace_config, MarketplaceConfig};
@@ -105,6 +106,7 @@ pub fn update_plugins(
     let mut marketplace: Marketplace = serde_json::from_str(&content)?;
 
     let mut updated = Vec::new();
+    let mut rename_targets: HashMap<String, String> = HashMap::new();
 
     for (name, plugin_path) in &plugin_paths {
         let plugin_json_path = plugin_path.join(".claude-plugin").join("plugin.json");
@@ -116,6 +118,14 @@ pub fn update_plugins(
         // Check for rename collisions
         if let Some(new_name) = manifest.name_str() {
             if new_name != name.as_str() {
+                // Check against other renames within this batch
+                if let Some(prev) = rename_targets.get(new_name) {
+                    return Err(SoukError::Other(format!(
+                        "Plugins '{prev}' and '{name}' would both be renamed to '{new_name}'"
+                    )));
+                }
+
+                // Check against plugins outside this batch
                 let collides = marketplace
                     .plugins
                     .iter()
@@ -125,6 +135,8 @@ pub fn update_plugins(
                         "Plugin '{name}' would be renamed to '{new_name}' which conflicts with an existing plugin"
                     )));
                 }
+
+                rename_targets.insert(new_name.to_string(), name.clone());
             }
         }
 
@@ -382,6 +394,45 @@ mod tests {
         assert!(
             err.contains("conflicts"),
             "Should report rename collision: {err}"
+        );
+
+        // marketplace.json should be unchanged (rolled back)
+        let content = fs::read_to_string(&config.marketplace_path).unwrap();
+        let mp: Marketplace = serde_json::from_str(&content).unwrap();
+        assert_eq!(mp.plugins.len(), 2);
+        assert!(mp.plugins.iter().any(|p| p.name == "alpha"));
+        assert!(mp.plugins.iter().any(|p| p.name == "beta"));
+    }
+
+    #[test]
+    fn update_detects_intra_batch_rename_collision() {
+        let tmp = TempDir::new().unwrap();
+        let config = setup_marketplace_with_plugins(&tmp, &["alpha", "beta"]);
+
+        // Modify both plugins to rename to the same target "gamma"
+        for name in &["alpha", "beta"] {
+            let pj = config
+                .plugin_root_abs
+                .join(name)
+                .join(".claude-plugin")
+                .join("plugin.json");
+            fs::write(
+                &pj,
+                r#"{"name":"gamma","version":"1.0.0","description":"test plugin","keywords":["original"]}"#,
+            )
+            .unwrap();
+        }
+
+        let result = update_plugins(
+            &["alpha".to_string(), "beta".to_string()],
+            None,
+            &config,
+        );
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("both be renamed to 'gamma'"),
+            "Should report intra-batch collision: {err}"
         );
 
         // marketplace.json should be unchanged (rolled back)

@@ -22,21 +22,24 @@ pub fn run_remove(
     reporter.section("Removing Plugins");
 
     match remove_plugins(plugins, delete, allow_external_delete, config) {
-        Ok(removed) => {
-            if removed.is_empty() {
+        Ok(result) => {
+            if result.removed.is_empty() {
                 reporter.info("No plugins removed");
             } else {
                 reporter.section("Summary");
-                for name in &removed {
+                for name in &result.removed {
                     if delete {
                         reporter.success(&format!("Removed and deleted: {name}"));
                     } else {
                         reporter.success(&format!("Removed: {name}"));
                     }
                 }
+                for warn in &result.warnings {
+                    reporter.warning(warn);
+                }
                 reporter.success(&format!(
                     "Successfully removed {} plugin(s) from marketplace",
-                    removed.len()
+                    result.removed.len()
                 ));
             }
             true
