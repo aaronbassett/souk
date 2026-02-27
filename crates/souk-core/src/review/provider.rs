@@ -338,102 +338,70 @@ mod tests {
         assert_eq!(provider.model(), "mock-model");
     }
 
+    // All env-var-dependent provider detection tests are combined into a
+    // single test to avoid races — Rust runs #[test] functions in parallel
+    // and env vars are process-global shared state.
     #[test]
-    fn detect_provider_no_env_vars_returns_no_api_key() {
-        // Clear all relevant env vars so auto-detection fails.
-        std::env::remove_var("ANTHROPIC_API_KEY");
-        std::env::remove_var("OPENAI_API_KEY");
-        std::env::remove_var("GEMINI_API_KEY");
+    fn detect_provider_env_based() {
+        fn clear_all() {
+            std::env::remove_var("ANTHROPIC_API_KEY");
+            std::env::remove_var("OPENAI_API_KEY");
+            std::env::remove_var("GEMINI_API_KEY");
+        }
 
-        let result = detect_provider(None, None);
-        match result {
-            Err(SoukError::NoApiKey) => {} // expected
+        // No env vars → NoApiKey
+        clear_all();
+        match detect_provider(None, None) {
+            Err(SoukError::NoApiKey) => {}
             Err(other) => panic!("Expected NoApiKey, got: {other:?}"),
             Ok(_) => panic!("Expected error, got Ok"),
         }
-    }
 
-    #[test]
-    fn detect_provider_with_anthropic_key() {
+        // Anthropic key → anthropic provider
+        clear_all();
         std::env::set_var("ANTHROPIC_API_KEY", "test-key-123");
-        // Ensure others are not set so we hit Anthropic first.
-        std::env::remove_var("OPENAI_API_KEY");
-        std::env::remove_var("GEMINI_API_KEY");
-
         let provider = detect_provider(None, None).unwrap();
         assert_eq!(provider.name(), "anthropic");
         assert_eq!(provider.model(), "claude-sonnet-4-20250514");
 
-        std::env::remove_var("ANTHROPIC_API_KEY");
-    }
-
-    #[test]
-    fn detect_provider_with_openai_key() {
-        std::env::remove_var("ANTHROPIC_API_KEY");
+        // OpenAI key → openai provider
+        clear_all();
         std::env::set_var("OPENAI_API_KEY", "test-key-456");
-        std::env::remove_var("GEMINI_API_KEY");
-
         let provider = detect_provider(None, None).unwrap();
         assert_eq!(provider.name(), "openai");
         assert_eq!(provider.model(), "gpt-4o");
 
-        std::env::remove_var("OPENAI_API_KEY");
-    }
-
-    #[test]
-    fn detect_provider_with_gemini_key() {
-        std::env::remove_var("ANTHROPIC_API_KEY");
-        std::env::remove_var("OPENAI_API_KEY");
+        // Gemini key → gemini provider
+        clear_all();
         std::env::set_var("GEMINI_API_KEY", "test-key-789");
-
         let provider = detect_provider(None, None).unwrap();
         assert_eq!(provider.name(), "gemini");
         assert_eq!(provider.model(), "gemini-2.0-flash");
 
-        std::env::remove_var("GEMINI_API_KEY");
-    }
-
-    #[test]
-    fn detect_provider_priority_anthropic_over_openai() {
+        // Priority: anthropic wins over openai
+        clear_all();
         std::env::set_var("ANTHROPIC_API_KEY", "key-a");
         std::env::set_var("OPENAI_API_KEY", "key-o");
-        std::env::remove_var("GEMINI_API_KEY");
-
         let provider = detect_provider(None, None).unwrap();
         assert_eq!(provider.name(), "anthropic");
 
-        std::env::remove_var("ANTHROPIC_API_KEY");
-        std::env::remove_var("OPENAI_API_KEY");
-    }
-
-    #[test]
-    fn detect_provider_explicit_override() {
+        // Explicit override picks the requested provider
+        clear_all();
         std::env::set_var("OPENAI_API_KEY", "key-o");
-        std::env::remove_var("ANTHROPIC_API_KEY");
-        std::env::remove_var("GEMINI_API_KEY");
-
         let provider = detect_provider(Some("openai"), None).unwrap();
         assert_eq!(provider.name(), "openai");
 
-        std::env::remove_var("OPENAI_API_KEY");
-    }
-
-    #[test]
-    fn detect_provider_explicit_override_missing_key() {
-        std::env::remove_var("ANTHROPIC_API_KEY");
-
-        let result = detect_provider(Some("anthropic"), None);
-        match result {
-            Err(SoukError::NoApiKey) => {} // expected
+        // Explicit override with missing key → NoApiKey
+        clear_all();
+        match detect_provider(Some("anthropic"), None) {
+            Err(SoukError::NoApiKey) => {}
             Err(other) => panic!("Expected NoApiKey, got: {other:?}"),
             Ok(_) => panic!("Expected error, got Ok"),
         }
-    }
 
-    #[test]
-    fn detect_provider_unknown_provider() {
-        let result = detect_provider(Some("unknown-provider"), None);
-        match result {
+        // Unknown provider → error
+        clear_all();
+        match detect_provider(Some("unknown-provider"), None) {
             Err(SoukError::Other(msg)) => {
                 assert!(
                     msg.contains("Unknown provider"),
@@ -443,19 +411,15 @@ mod tests {
             Err(other) => panic!("Expected Other, got: {other:?}"),
             Ok(_) => panic!("Expected error, got Ok"),
         }
-    }
 
-    #[test]
-    fn detect_provider_model_override() {
+        // Model override
+        clear_all();
         std::env::set_var("ANTHROPIC_API_KEY", "key-a");
-        std::env::remove_var("OPENAI_API_KEY");
-        std::env::remove_var("GEMINI_API_KEY");
-
         let provider = detect_provider(None, Some("claude-opus-4-20250514")).unwrap();
         assert_eq!(provider.name(), "anthropic");
         assert_eq!(provider.model(), "claude-opus-4-20250514");
 
-        std::env::remove_var("ANTHROPIC_API_KEY");
+        clear_all();
     }
 
     #[test]

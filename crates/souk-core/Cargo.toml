@@ -2,6 +2,10 @@
 name = "souk-core"
 version.workspace = true
 edition.workspace = true
+description = "Core library for managing Claude Code plugin marketplaces"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

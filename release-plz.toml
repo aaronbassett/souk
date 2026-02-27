@@ -1,0 +1,8 @@
+[workspace]
+git_tag_enable = true
+git_release_enable = false    # cargo-dist handles GitHub Releases
+changelog_update = true
+dependencies_update = true
+semver_check = true
+pr_labels = ["release"]
+repo_url = "https://github.com/aaronbassett/souk"

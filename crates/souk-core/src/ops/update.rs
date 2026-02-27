@@ -423,11 +423,7 @@ mod tests {
             .unwrap();
         }
 
-        let result = update_plugins(
-            &["alpha".to_string(), "beta".to_string()],
-            None,
-            &config,
-        );
+        let result = update_plugins(&["alpha".to_string(), "beta".to_string()], None, &config);
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(

@@ -6,3 +6,26 @@ members = ["crates/souk-core", "crates/souk"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+repository = "https://github.com/aaronbassett/souk"
+homepage = "https://github.com/aaronbassett/souk"
+
+# Config for 'cargo dist'
+[workspace.metadata.dist]
+cargo-dist-version = "0.31.0"
+ci = ["github"]
+installers = ["shell", "powershell", "homebrew"]
+targets = [
+    "aarch64-apple-darwin",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+]
+tap = "aaronbassett/homebrew-tap"
+publish-jobs = ["homebrew"]
+pr-run-mode = "skip"
+
+# The profile that 'cargo dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

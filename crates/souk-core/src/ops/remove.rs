@@ -359,7 +359,7 @@ mod tests {
         let plugins_dir = tmp.path().join("plugins");
         fs::create_dir_all(&plugins_dir).unwrap();
 
-        let ext_path_str = ext_plugin.to_string_lossy();
+        let ext_path_str = ext_plugin.to_string_lossy().replace('\\', "/");
         let mp_json = format!(
             r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{{"name":"ext","source":"{ext_path_str}"}}]}}"#
         );
@@ -395,7 +395,7 @@ mod tests {
         let plugins_dir = tmp.path().join("plugins");
         fs::create_dir_all(&plugins_dir).unwrap();
 
-        let ext_path_str = ext_plugin.to_string_lossy();
+        let ext_path_str = ext_plugin.to_string_lossy().replace('\\', "/");
         let mp_json = format!(
             r#"{{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{{"name":"ext","source":"{ext_path_str}"}}]}}"#
         );

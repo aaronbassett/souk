@@ -591,7 +591,7 @@ mod tests {
         assert_eq!(plan.actions.len(), 1);
         assert!(plan.actions[0].is_external);
         // Source should be absolute path since no_copy is true
-        assert!(plan.actions[0].source.starts_with('/'));
+        assert!(std::path::Path::new(&plan.actions[0].source).is_absolute());
     }
 
     #[cfg(unix)]
