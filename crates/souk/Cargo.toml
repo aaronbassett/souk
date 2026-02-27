@@ -2,13 +2,17 @@
 name = "souk"
 version.workspace = true
 edition.workspace = true
+description = "CLI tool for managing Claude Code plugin marketplaces"
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
 
 [[bin]]
 name = "souk"
 path = "src/main.rs"
 
 [dependencies]
-souk-core = { path = "../souk-core" }
+souk-core = { path = "../souk-core", version = "0.1.0" }
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 colored = "2"
