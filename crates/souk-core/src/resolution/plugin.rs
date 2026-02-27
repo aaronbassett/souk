@@ -141,6 +141,6 @@ mod tests {
         let external = TempDir::new().unwrap();
         let (source, is_internal) = plugin_path_to_source(external.path(), &config);
         assert!(!is_internal);
-        assert!(source.starts_with('/'));
+        assert!(std::path::Path::new(&source).is_absolute());
     }
 }
