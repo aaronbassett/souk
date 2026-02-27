@@ -43,11 +43,7 @@ fn prune_dry_run_lists_orphans() {
     let mp_path = tmp.path().join(".claude-plugin").join("marketplace.json");
 
     souk_cmd()
-        .args([
-            "prune",
-            "--marketplace",
-            mp_path.to_str().unwrap(),
-        ])
+        .args(["prune", "--marketplace", mp_path.to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains("dry-run"))
@@ -91,11 +87,7 @@ fn prune_nothing_to_do() {
     let mp_path = tmp.path().join(".claude-plugin").join("marketplace.json");
 
     souk_cmd()
-        .args([
-            "prune",
-            "--marketplace",
-            mp_path.to_str().unwrap(),
-        ])
+        .args(["prune", "--marketplace", mp_path.to_str().unwrap()])
         .assert()
         .success()
         .stdout(predicate::str::contains("No orphaned"));
