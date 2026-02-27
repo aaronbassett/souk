@@ -111,6 +111,13 @@ pub enum Commands {
         plugin_root: String,
     },
 
+    /// Remove orphaned plugin directories not listed in marketplace.json
+    Prune {
+        /// Actually delete orphaned directories (default: dry-run)
+        #[arg(long)]
+        apply: bool,
+    },
+
     /// Generate shell completions
     Completions {
         /// Shell to generate completions for

@@ -1,6 +1,7 @@
 pub mod add;
 pub mod ci;
 pub mod init;
+pub mod prune;
 pub mod remove;
 pub mod review;
 pub mod update;
