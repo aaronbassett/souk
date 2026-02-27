@@ -39,6 +39,26 @@ pub struct RemoveResult {
 /// the marketplace.
 ///
 /// Returns [`SoukError::AtomicRollback`] if the post-removal validation fails.
+///
+/// # Example
+///
+/// ```no_run
+/// # use souk_core::ops::remove::remove_plugins;
+/// # fn example(config: &souk_core::discovery::MarketplaceConfig) {
+/// let result = remove_plugins(
+///     &["my-plugin".to_string()],
+///     true,  // delete files
+///     false, // don't allow external deletes
+///     config,
+/// ).unwrap();
+///
+/// for name in &result.removed {
+///     println!("Removed: {name}");
+/// }
+/// for warn in &result.warnings {
+///     eprintln!("Warning: {warn}");
+/// }
+/// # }
 pub fn remove_plugins(
     names: &[String],
     delete_files: bool,
