@@ -45,10 +45,7 @@ pub fn prune_plugins(apply: bool, config: &MarketplaceConfig) -> Result<PruneRes
     for path in &orphaned {
         match fs::remove_dir_all(path) {
             Ok(()) => deleted.push(path.clone()),
-            Err(e) => warnings.push(format!(
-                "Failed to delete {}: {e}",
-                path.display()
-            )),
+            Err(e) => warnings.push(format!("Failed to delete {}: {e}", path.display())),
         }
     }
 
