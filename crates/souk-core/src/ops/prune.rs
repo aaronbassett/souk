@@ -122,6 +122,47 @@ mod tests {
     }
 
     #[test]
+    fn prune_partial_failure_warns() {
+        let tmp = TempDir::new().unwrap();
+        let config = setup_marketplace(
+            &tmp,
+            r#"{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{"name":"kept","source":"kept"}]}"#,
+            &["kept", "orphan1", "orphan2"],
+        );
+
+        // Delete one orphan directory before pruning so remove_dir_all will fail on it
+        let orphan1_path = config.plugin_root_abs.join("orphan1");
+        std::fs::remove_dir_all(&orphan1_path).unwrap();
+        // Create a file at the same path so it's still found by read_dir but remove_dir_all
+        // won't work as expected — actually, let's just remove it so it's gone from the scan.
+        // Instead: make one orphan's directory unreadable.
+        // On Linux, remove write permission from pluginRoot so deletion fails.
+        use std::os::unix::fs::PermissionsExt;
+        // Restore orphan1
+        let p = orphan1_path.join(".claude-plugin");
+        std::fs::create_dir_all(&p).unwrap();
+        std::fs::write(
+            p.join("plugin.json"),
+            r#"{"name":"orphan1","version":"1.0.0","description":"test"}"#,
+        )
+        .unwrap();
+
+        // Make orphan1 non-deletable by removing write permission on it
+        std::fs::set_permissions(&orphan1_path, std::fs::Permissions::from_mode(0o555)).unwrap();
+
+        let result = prune_plugins(true, &config).unwrap();
+
+        // Restore permissions for cleanup
+        std::fs::set_permissions(&orphan1_path, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert_eq!(result.orphaned.len(), 2);
+        // One should succeed, one should fail
+        assert_eq!(result.deleted.len(), 1);
+        assert_eq!(result.warnings.len(), 1);
+        assert!(result.warnings[0].contains("Failed to delete"));
+    }
+
+    #[test]
     fn prune_no_orphans() {
         let tmp = TempDir::new().unwrap();
         let config = setup_marketplace(
