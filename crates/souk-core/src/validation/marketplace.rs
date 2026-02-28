@@ -86,6 +86,43 @@ pub fn validate_marketplace(config: &MarketplaceConfig, skip_plugins: bool) -> V
     result
 }
 
+/// Returns full paths of directories under pluginRoot that are not listed in marketplace.json.
+///
+/// Scans the plugin root directory and compares against the marketplace entries.
+/// Used by both validation (to warn) and prune (to delete).
+pub fn find_orphaned_dirs(
+    config: &MarketplaceConfig,
+) -> Result<Vec<std::path::PathBuf>, crate::error::SoukError> {
+    let fs_plugins: HashSet<String> = match std::fs::read_dir(&config.plugin_root_abs) {
+        Ok(entries) => entries
+            .flatten()
+            .filter(|e| e.path().is_dir())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect(),
+        Err(e) => return Err(crate::error::SoukError::Io(e)),
+    };
+
+    let mp_sources: HashSet<String> = config
+        .marketplace
+        .plugins
+        .iter()
+        .map(|p| {
+            Path::new(&p.source)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| p.source.clone())
+        })
+        .collect();
+
+    let orphans = fs_plugins
+        .iter()
+        .filter(|name| !mp_sources.contains(*name))
+        .map(|name| config.plugin_root_abs.join(name))
+        .collect();
+
+    Ok(orphans)
+}
+
 /// Checks that the filesystem and marketplace are in sync.
 ///
 /// Reports:
@@ -96,6 +133,23 @@ pub fn validate_marketplace(config: &MarketplaceConfig, skip_plugins: bool) -> V
 fn check_completeness(config: &MarketplaceConfig) -> ValidationResult {
     let mut result = ValidationResult::new();
 
+    // Orphaned dirs on filesystem — reuse shared helper
+    match find_orphaned_dirs(config) {
+        Ok(orphans) => {
+            for path in orphans {
+                let name = path.file_name().unwrap().to_string_lossy();
+                result.push(
+                    ValidationDiagnostic::warning(format!(
+                        "Plugin in filesystem but not in marketplace: {name}"
+                    ))
+                    .with_path(&path),
+                );
+            }
+        }
+        Err(_) => return result,
+    }
+
+    // Missing dirs from marketplace — keep existing logic
     let fs_plugins: HashSet<String> = match std::fs::read_dir(&config.plugin_root_abs) {
         Ok(entries) => entries
             .flatten()
@@ -116,17 +170,6 @@ fn check_completeness(config: &MarketplaceConfig) -> ValidationResult {
                 .unwrap_or_else(|| p.source.clone())
         })
         .collect();
-
-    for fs_name in &fs_plugins {
-        if !mp_sources.contains(fs_name) {
-            result.push(
-                ValidationDiagnostic::warning(format!(
-                    "Plugin in filesystem but not in marketplace: {fs_name}"
-                ))
-                .with_path(config.plugin_root_abs.join(fs_name)),
-            );
-        }
-    }
 
     for mp_source in &mp_sources {
         if !fs_plugins.contains(mp_source) {
@@ -299,5 +342,35 @@ mod tests {
         );
         let result = validate_marketplace(&config, true);
         assert!(!result.has_errors());
+    }
+
+    #[test]
+    fn find_orphaned_dirs_returns_correct_paths() {
+        let tmp = TempDir::new().unwrap();
+        let config = setup_marketplace(
+            &tmp,
+            r#"{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{"name":"kept","source":"kept"}]}"#,
+            &["kept", "orphan1", "orphan2"],
+        );
+        let orphans = find_orphaned_dirs(&config).unwrap();
+        assert_eq!(orphans.len(), 2);
+        let names: Vec<String> = orphans
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert!(names.contains(&"orphan1".to_string()));
+        assert!(names.contains(&"orphan2".to_string()));
+    }
+
+    #[test]
+    fn find_orphaned_dirs_empty_when_all_registered() {
+        let tmp = TempDir::new().unwrap();
+        let config = setup_marketplace(
+            &tmp,
+            r#"{"version":"0.1.0","pluginRoot":"./plugins","plugins":[{"name":"a","source":"a"}]}"#,
+            &["a"],
+        );
+        let orphans = find_orphaned_dirs(&config).unwrap();
+        assert!(orphans.is_empty());
     }
 }

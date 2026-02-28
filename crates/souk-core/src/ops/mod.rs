@@ -8,6 +8,7 @@
 pub mod add;
 pub mod atomic;
 pub mod init;
+pub mod prune;
 pub mod remove;
 pub mod update;
 

@@ -124,6 +124,10 @@ fn main() {
             },
             CiAction::Install { target } => commands::ci::run_ci_install(&target, &mut reporter),
         },
+        Commands::Prune { apply } => match load_config_required(marketplace, &mut reporter) {
+            Some(config) => commands::prune::run_prune(apply, &config, &mut reporter),
+            None => false,
+        },
         Commands::Completions { shell } => {
             use clap::CommandFactory;
             clap_complete::generate(
