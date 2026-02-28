@@ -121,6 +121,7 @@ mod tests {
         assert!(config.plugin_root_abs.join("kept").exists());
     }
 
+    #[cfg(unix)]
     #[test]
     fn prune_partial_failure_warns() {
         let tmp = TempDir::new().unwrap();
