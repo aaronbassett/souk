@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use indicatif::{ProgressBar, ProgressStyle};
 use souk_core::discovery::{discover_marketplace, load_marketplace_config, MarketplaceConfig};
-use souk_core::resolution::resolve_plugin;
+use souk_core::resolution::{resolve_plugin, resolve_source};
 use souk_core::validation::{validate_marketplace, validate_plugin};
 
 use crate::output::{OutputMode, Reporter};
@@ -53,15 +53,39 @@ pub fn run_validate_plugin(
 
         if result.has_errors() {
             failure_count += 1;
-            reporter.report_validation(&result);
+            if let Some(pb) = &progress {
+                // Print validation errors through the progress bar to avoid interleaving
+                for diagnostic in &result.diagnostics {
+                    let mut msg = diagnostic.message.clone();
+                    if let Some(p) = &diagnostic.path {
+                        msg = format!("{msg} ({})", p.display());
+                    }
+                    pb.println(format!("ERROR: {msg}"));
+                }
+            } else {
+                reporter.report_validation(&result);
+            }
         } else {
             success_count += 1;
-            reporter.success_with_details(
-                &format!("Plugin validated: {plugin_name}"),
-                &format!("path: {}", path.display()),
-            );
-            if result.warning_count() > 0 {
-                reporter.report_validation(&result);
+            if let Some(pb) = &progress {
+                pb.println(format!("✓ Plugin validated: {plugin_name}"));
+                if result.warning_count() > 0 {
+                    for diagnostic in &result.diagnostics {
+                        let mut msg = diagnostic.message.clone();
+                        if let Some(p) = &diagnostic.path {
+                            msg = format!("{msg} ({})", p.display());
+                        }
+                        pb.println(format!("WARNING: {msg}"));
+                    }
+                }
+            } else {
+                reporter.success_with_details(
+                    &format!("Plugin validated: {plugin_name}"),
+                    &format!("path: {}", path.display()),
+                );
+                if result.warning_count() > 0 {
+                    reporter.report_validation(&result);
+                }
             }
         }
 
@@ -93,17 +117,122 @@ pub fn run_validate_marketplace(
         None => return false,
     };
 
+    // Step 1: Validate marketplace structure (always skip plugins here, we handle them below)
     reporter.section("Validating marketplace");
 
-    let result = validate_marketplace(&config, skip_plugins);
-
+    let result = validate_marketplace(&config, true);
     reporter.report_validation(&result);
 
-    if result.has_errors() {
+    let mut has_errors = result.has_errors();
+
+    if has_errors {
         reporter.error("Marketplace validation failed");
+    } else {
+        reporter.success(&format!(
+            "Marketplace validated: {}",
+            config.marketplace_path.display()
+        ));
+    }
+
+    // Step 2: Check completeness is already included in the marketplace validation above
+
+    // Step 3: Validate individual plugins (unless skipped)
+    if !skip_plugins && config.plugin_root_abs.is_dir() {
+        let plugins = &config.marketplace.plugins;
+        if !plugins.is_empty() {
+            reporter.section(&format!("Validating {} plugin(s)", plugins.len()));
+
+            let mut success_count = 0;
+            let mut failure_count = 0;
+
+            // Show progress bar for multiple plugins in Human mode
+            let progress = if plugins.len() > 1 && reporter.mode() == OutputMode::Human {
+                let pb = ProgressBar::new(plugins.len() as u64);
+                pb.set_style(
+                    ProgressStyle::with_template("{spinner} [{bar:40}] {pos}/{len} {msg}")
+                        .unwrap()
+                        .progress_chars("=> "),
+                );
+                Some(pb)
+            } else {
+                None
+            };
+
+            for entry in plugins {
+                let source = &entry.source;
+                let plugin_path = resolve_source(source, &config)
+                    .unwrap_or_else(|_| config.plugin_root_abs.join(source));
+
+                let plugin_name = plugin_path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| source.clone());
+
+                if let Some(pb) = &progress {
+                    pb.set_message(plugin_name.clone());
+                }
+
+                if plugin_path.is_dir() {
+                    let plugin_result = validate_plugin(&plugin_path);
+
+                    if plugin_result.has_errors() {
+                        failure_count += 1;
+                        has_errors = true;
+                        if let Some(pb) = &progress {
+                            for diagnostic in &plugin_result.diagnostics {
+                                let mut msg = diagnostic.message.clone();
+                                if let Some(p) = &diagnostic.path {
+                                    msg = format!("{msg} ({})", p.display());
+                                }
+                                pb.println(format!("ERROR: {msg}"));
+                            }
+                        } else {
+                            reporter.report_validation(&plugin_result);
+                        }
+                    } else {
+                        success_count += 1;
+                        if let Some(pb) = &progress {
+                            pb.println(format!("✓ Plugin validated: {plugin_name}"));
+                        } else {
+                            reporter.success(&format!("Plugin validated: {plugin_name}"));
+                        }
+                    }
+                } else {
+                    failure_count += 1;
+                    has_errors = true;
+                    if let Some(pb) = &progress {
+                        pb.println(format!("ERROR: Plugin directory not found: {}", plugin_path.display()));
+                    } else {
+                        reporter.error(&format!(
+                            "Plugin directory not found: {}",
+                            plugin_path.display()
+                        ));
+                    }
+                }
+
+                if let Some(pb) = &progress {
+                    pb.inc(1);
+                }
+            }
+
+            if let Some(pb) = progress {
+                pb.finish_and_clear();
+            }
+
+            reporter.info(&format!(
+                "{} plugin(s): {success_count} passed, {failure_count} failed",
+                plugins.len()
+            ));
+        }
+    }
+
+    // Final summary
+    reporter.section("Summary");
+    if has_errors {
+        reporter.error("Marketplace validation completed with errors");
         false
     } else {
-        reporter.success("Marketplace validation passed");
+        reporter.success("Marketplace validation completed successfully");
         true
     }
 }

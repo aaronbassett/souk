@@ -57,7 +57,7 @@ fn validate_marketplace_valid() {
         ])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Marketplace validation passed"));
+        .stdout(predicate::str::contains("Marketplace validation completed successfully"));
 }
 
 #[test]
