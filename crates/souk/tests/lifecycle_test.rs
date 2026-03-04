@@ -67,7 +67,9 @@ fn full_lifecycle() {
         ])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Marketplace validation completed successfully"));
+        .stdout(predicate::str::contains(
+            "Marketplace validation completed successfully",
+        ));
 
     // 6. Update plugin with patch bump
     souk_cmd()

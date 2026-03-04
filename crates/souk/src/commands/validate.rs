@@ -201,7 +201,10 @@ pub fn run_validate_marketplace(
                     failure_count += 1;
                     has_errors = true;
                     if let Some(pb) = &progress {
-                        pb.println(format!("ERROR: Plugin directory not found: {}", plugin_path.display()));
+                        pb.println(format!(
+                            "ERROR: Plugin directory not found: {}",
+                            plugin_path.display()
+                        ));
                     } else {
                         reporter.error(&format!(
                             "Plugin directory not found: {}",
