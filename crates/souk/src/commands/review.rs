@@ -4,7 +4,7 @@ use souk_core::discovery::{discover_marketplace, load_marketplace_config, Market
 use souk_core::resolution::resolve_plugin;
 use souk_core::review::{detect_provider, review_plugin};
 
-use crate::output::Reporter;
+use crate::output::{OutputMode, Reporter};
 
 /// Run the `souk review plugin` command.
 ///
@@ -49,6 +49,14 @@ pub fn run_review_plugin(
             reporter.success(&format!("Plugin review complete: {}", report.plugin_name));
             if output_path.is_some() {
                 reporter.info("Review report saved");
+            }
+            // Display the review text
+            match reporter.mode() {
+                OutputMode::Human => println!("\n{}", report.review_text),
+                OutputMode::Json => {
+                    reporter.info(&report.review_text);
+                }
+                OutputMode::Quiet => {}
             }
             true
         }
