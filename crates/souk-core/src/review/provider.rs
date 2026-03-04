@@ -37,11 +37,14 @@ pub struct AnthropicProvider {
 impl AnthropicProvider {
     /// Create a new Anthropic provider.
     ///
-    /// If `model` is `None`, defaults to `claude-sonnet-4-20250514`.
+    /// If `model` is `None`, defaults to `claude-sonnet-4-6`.
+    ///
+    /// Anthropic does not offer a `-latest` alias; this must be updated
+    /// manually when new model versions are released.
     pub fn new(api_key: String, model: Option<String>) -> Self {
         Self {
             api_key,
-            model: model.unwrap_or_else(|| "claude-sonnet-4-20250514".to_string()),
+            model: model.unwrap_or_else(|| "claude-sonnet-4-6".to_string()),
             client: reqwest::blocking::Client::new(),
         }
     }
@@ -106,11 +109,11 @@ pub struct OpenAiProvider {
 impl OpenAiProvider {
     /// Create a new OpenAI provider.
     ///
-    /// If `model` is `None`, defaults to `gpt-4o`.
+    /// If `model` is `None`, defaults to `gpt-5-mini`.
     pub fn new(api_key: String, model: Option<String>) -> Self {
         Self {
             api_key,
-            model: model.unwrap_or_else(|| "gpt-4o".to_string()),
+            model: model.unwrap_or_else(|| "gpt-5-mini".to_string()),
             client: reqwest::blocking::Client::new(),
         }
     }
@@ -174,11 +177,11 @@ pub struct GeminiProvider {
 impl GeminiProvider {
     /// Create a new Gemini provider.
     ///
-    /// If `model` is `None`, defaults to `gemini-2.0-flash`.
+    /// If `model` is `None`, defaults to `gemini-flash-latest`.
     pub fn new(api_key: String, model: Option<String>) -> Self {
         Self {
             api_key,
-            model: model.unwrap_or_else(|| "gemini-2.0-flash".to_string()),
+            model: model.unwrap_or_else(|| "gemini-flash-latest".to_string()),
             client: reqwest::blocking::Client::new(),
         }
     }
@@ -362,21 +365,21 @@ mod tests {
         std::env::set_var("ANTHROPIC_API_KEY", "test-key-123");
         let provider = detect_provider(None, None).unwrap();
         assert_eq!(provider.name(), "anthropic");
-        assert_eq!(provider.model(), "claude-sonnet-4-20250514");
+        assert_eq!(provider.model(), "claude-sonnet-4-6");
 
         // OpenAI key → openai provider
         clear_all();
         std::env::set_var("OPENAI_API_KEY", "test-key-456");
         let provider = detect_provider(None, None).unwrap();
         assert_eq!(provider.name(), "openai");
-        assert_eq!(provider.model(), "gpt-4o");
+        assert_eq!(provider.model(), "gpt-5-mini");
 
         // Gemini key → gemini provider
         clear_all();
         std::env::set_var("GEMINI_API_KEY", "test-key-789");
         let provider = detect_provider(None, None).unwrap();
         assert_eq!(provider.name(), "gemini");
-        assert_eq!(provider.model(), "gemini-2.0-flash");
+        assert_eq!(provider.model(), "gemini-flash-latest");
 
         // Priority: anthropic wins over openai
         clear_all();
@@ -433,21 +436,21 @@ mod tests {
     #[test]
     fn anthropic_provider_default_model() {
         let provider = AnthropicProvider::new("key".into(), None);
-        assert_eq!(provider.model(), "claude-sonnet-4-20250514");
+        assert_eq!(provider.model(), "claude-sonnet-4-6");
         assert_eq!(provider.name(), "anthropic");
     }
 
     #[test]
     fn openai_provider_default_model() {
         let provider = OpenAiProvider::new("key".into(), None);
-        assert_eq!(provider.model(), "gpt-4o");
+        assert_eq!(provider.model(), "gpt-5-mini");
         assert_eq!(provider.name(), "openai");
     }
 
     #[test]
     fn gemini_provider_default_model() {
         let provider = GeminiProvider::new("key".into(), None);
-        assert_eq!(provider.model(), "gemini-2.0-flash");
+        assert_eq!(provider.model(), "gemini-flash-latest");
         assert_eq!(provider.name(), "gemini");
     }
 
