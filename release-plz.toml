@@ -1,8 +1,36 @@
+# release-plz configuration
+# Manages: version bumping, changelog generation, crates.io publishing, git tagging
+
 [workspace]
+# Use git-cliff for changelog formatting
+changelog_config = "cliff.toml"
+
+# Run cargo-semver-checks on the core library to detect breaking API changes
+semver_check = false
+
+# Let cargo-dist handle GitHub Releases (not release-plz)
+git_release_enable = false
+
+# release-plz creates the git tags that trigger cargo-dist
 git_tag_enable = true
-git_release_enable = false    # cargo-dist handles GitHub Releases
-changelog_update = true
-dependencies_update = true
-semver_check = true
+
+# Publish to crates.io by default
+publish = true
+
+# Wait up to 10 minutes for crates.io to index (important for dependency ordering)
+publish_timeout = "10m"
+
+# Release PR configuration
 pr_labels = ["release"]
-repo_url = "https://github.com/aaronbassett/souk"
+
+[changelog]
+protect_breaking_commits = true
+
+# Core library: enable semver checking for API stability
+[[package]]
+name = "souk-core"
+semver_check = true
+
+# CLI binary: no semver check needed (no public API)
+[[package]]
+name = "souk"
