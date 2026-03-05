@@ -23,9 +23,6 @@ publish_timeout = "10m"
 # Release PR configuration
 pr_labels = ["release"]
 
-[changelog]
-protect_breaking_commits = true
-
 # Core library: enable semver checking for API stability
 [[package]]
 name = "souk-core"
