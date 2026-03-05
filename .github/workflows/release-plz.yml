@@ -1,4 +1,11 @@
+# .github/workflows/release-plz.yml
+# Manages version bumps, changelogs, crates.io publishing, and git tagging
+
 name: Release-plz
+
+permissions:
+  pull-requests: write
+  contents: write
 
 on:
   push:
@@ -6,40 +13,21 @@ on:
       - main
 
 jobs:
-  release-plz-release:
-    name: Release-plz release
+  release-plz:
+    name: Release-plz
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: release-plz/action@v0.5
-        with:
-          command: release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-  release-plz-pr:
-    name: Release-plz PR
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    concurrency:
-      group: release-plz-${{ github.ref }}
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: release-plz/action@v0.5
-        with:
-          command: release-pr
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run release-plz
+        uses: MarcoIeni/release-plz-action@v0.5
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT required so that tag creation triggers the cargo-dist release workflow
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
